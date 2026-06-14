@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manager Dashboard - TaskMaster Pro</title>
+    <meta name="description" content="View team metrics, manage active projects, assign tasks, and monitor upcoming deadlines in TaskMaster Pro.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/manager-dashboard.css">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <!-- Sidebar Navigation Drawer Overlay -->
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <a href="#" class="logo-area">
+                    <svg width="28" height="28" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="40" height="40" rx="12" fill="url(#logo-gradient)"/>
+                        <path d="M12 20L17 25L28 14" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <defs>
+                            <linearGradient id="logo-gradient" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#3B82F6"/>
+                                <stop offset="1" stop-color="#8B5CF6"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <span class="logo-text">TaskMaster <span class="logo-accent">Pro</span></span>
+                </a>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <ul class="nav-list">
+                    <li class="nav-item">
+                        <a href="#" class="nav-link active" id="nav-dashboard">
+                            <!-- Home Icon -->
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <!-- Folders Icon -->
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+                            <span>Projects</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <!-- Check List Icon -->
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="m9 12 2 2 4-4"/></svg>
+                            <span>Tasks</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <!-- Users Icon -->
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            <span>Team Members</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <!-- Calendar Icon -->
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                            <span>Calendar</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <!-- Chart / Reports Icon -->
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
+                            <span>Reports</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <!-- Notification Bell Icon -->
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                            <span>Notifications</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <!-- Settings Profile Icon -->
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></svg>
+                            <span>Profile</span>
+                        </a>
+                    </li>
+                </ul>
+
+                <ul class="nav-list sidebar-footer">
+                    <li class="nav-item">
+                        <a href="login.html" class="nav-link logout-link" id="logout-link">
+                            <!-- Logout Icon -->
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                            <span>Logout</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Dashboard Section -->
+        <main class="main-content">
+            <!-- Top Navigation -->
+            <header class="top-nav">
+                <div class="nav-left">
+                    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle Navigation Sidebar">
+                        <!-- Hamburger Menu Icon -->
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+                    </button>
+                    <!-- Search Bar -->
+                    <div class="search-wrapper">
+                        <span class="search-icon" aria-hidden="true">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        </span>
+                        <input type="text" class="search-input" placeholder="Search tasks, projects...">
+                    </div>
+                </div>
+
+                <div class="nav-right">
+                    <!-- Notification Bell -->
+                    <button class="nav-action-btn" aria-label="View notifications">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                        <span class="notification-badge"></span>
+                    </button>
+                    
+                    <!-- User Profile Area -->
+                    <div class="user-profile">
+                        <div class="profile-avatar" id="avatar-initials">AM</div>
+                        <div class="profile-info">
+                            <span class="profile-name" id="manager-name">Alex Mercer</span>
+                            <span class="profile-role">Project Manager</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard Content Body -->
+            <div class="content-body">
+                <!-- Welcome Title banner -->
+                <div class="welcome-banner">
+                    <h1>Project Manager Dashboard</h1>
+                    <p>Track metrics, manage board configurations, and coordinate team task alignments.</p>
+                </div>
+
+                <!-- Dashboard Summary Statistics Cards -->
+                <section class="stats-grid" aria-label="TaskMaster Pro Quick Stats">
+                    <!-- Total Projects -->
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-card-label">Total Projects</span>
+                            <span class="stat-card-icon blue">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+                            </span>
+                        </div>
+                        <div class="stat-card-value" id="stat-total-projects">8</div>
+                        <div class="stat-card-trend"><span class="trend-up">+1</span> active this month</div>
+                    </div>
+
+                    <!-- Active Projects -->
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-card-label">Active Projects</span>
+                            <span class="stat-card-icon purple">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m10 8 6 4-6 4V8z"/></svg>
+                            </span>
+                        </div>
+                        <div class="stat-card-value" id="stat-active-projects">5</div>
+                        <div class="stat-card-trend"><span class="trend-up">62.5%</span> of total capacity</div>
+                    </div>
+
+                    <!-- Total Tasks -->
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-card-label">Total Tasks</span>
+                            <span class="stat-card-icon indigo">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M9 17h6"/><path d="M9 12h6"/><path d="M9 7h6"/></svg>
+                            </span>
+                        </div>
+                        <div class="stat-card-value" id="stat-total-tasks">48</div>
+                        <div class="stat-card-trend"><span class="trend-up">+8</span> added this week</div>
+                    </div>
+
+                    <!-- Completed Tasks -->
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-card-label">Completed Tasks</span>
+                            <span class="stat-card-icon green">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            </span>
+                        </div>
+                        <div class="stat-card-value" id="stat-completed-tasks">32</div>
+                        <div class="stat-card-trend"><span class="trend-up">66%</span> completion rate</div>
+                    </div>
+
+                    <!-- Overdue Tasks -->
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-card-label">Overdue Tasks</span>
+                            <span class="stat-card-icon red">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                            </span>
+                        </div>
+                        <div class="stat-card-value" id="stat-overdue-tasks">3</div>
+                        <div class="stat-card-trend"><span class="trend-down">-1</span> resolved today</div>
+                    </div>
+
+                    <!-- Team Members -->
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-card-label">Team Members</span>
+                            <span class="stat-card-icon blue">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            </span>
+                        </div>
+                        <div class="stat-card-value" id="stat-team-members">12</div>
+                        <div class="stat-card-trend">Across <span class="trend-up">3</span> workspaces</div>
+                    </div>
+                </section>
+
+                <!-- Responsive Grid for Main Sections -->
+                <div class="dashboard-grid">
+                    <!-- Left Column (Grid width span: 2) -->
+                    <div class="left-column">
+                        <!-- Project Progress Overview Section -->
+                        <section class="panel" aria-labelledby="project-progress-title">
+                            <div class="panel-header">
+                                <h2 class="panel-title" id="project-progress-title">Project Progress Overview</h2>
+                                <a href="#" class="panel-action">View all projects</a>
+                            </div>
+                            <div class="panel-body">
+                                <div class="project-list" id="project-progress-list">
+                                    <!-- Dynamic list populated by Javascript -->
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Recent Tasks Section -->
+                        <section class="panel" aria-labelledby="recent-tasks-title">
+                            <div class="panel-header">
+                                <h2 class="panel-title" id="recent-tasks-title">Recent Tasks</h2>
+                                <a href="#" class="panel-action">Go to Taskboard</a>
+                            </div>
+                            <div class="panel-body">
+                                <div class="table-wrapper">
+                                    <table class="custom-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Task Title</th>
+                                                <th>Assigned To</th>
+                                                <th>Priority</th>
+                                                <th>Status</th>
+                                                <th>Due Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="recent-tasks-list">
+                                            <!-- Dynamic rows populated by Javascript -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- Right Column (Grid width span: 1) -->
+                    <div class="right-column">
+                        <!-- Quick Actions Panel -->
+                        <section class="panel" aria-labelledby="quick-actions-title">
+                            <div class="panel-header">
+                                <h2 class="panel-title" id="quick-actions-title">Quick Actions</h2>
+                            </div>
+                            <div class="panel-body">
+                                <div class="actions-grid">
+                                    <!-- Create Project -->
+                                    <button class="action-btn" id="action-btn-create-project">
+                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="12" x2="12" y1="8" y2="16"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
+                                        <span>Create Project</span>
+                                    </button>
+                                    
+                                    <!-- Create Task -->
+                                    <button class="action-btn" id="action-btn-create-task">
+                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                                        <span>Create Task</span>
+                                    </button>
+                                    
+                                    <!-- Assign Task -->
+                                    <button class="action-btn" id="action-btn-assign-task">
+                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="16" x2="22" y1="11" y2="11"/></svg>
+                                        <span>Assign Task</span>
+                                    </button>
+                                    
+                                    <!-- Generate Report -->
+                                    <button class="action-btn" id="action-btn-generate-report">
+                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
+                                        <span>Generate Report</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Upcoming Deadlines -->
+                        <section class="panel" aria-labelledby="deadlines-title">
+                            <div class="panel-header">
+                                <h2 class="panel-title" id="deadlines-title">Upcoming Deadlines</h2>
+                            </div>
+                            <div class="panel-body">
+                                <div class="deadline-list" id="upcoming-deadlines-list">
+                                    <!-- Dynamic deadline boxes populated by Javascript -->
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Team Performance Section -->
+                        <section class="panel" aria-labelledby="team-perf-title">
+                            <div class="panel-header">
+                                <h2 class="panel-title" id="team-perf-title">Team Performance</h2>
+                            </div>
+                            <div class="panel-body">
+                                <div class="team-list" id="team-performance-list">
+                                    <!-- Dynamic rows populated by Javascript -->
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals System Container Elements -->
+    
+    <!-- 1. Create Project Modal -->
+    <div class="modal-overlay" id="modal-create-project" role="dialog" aria-modal="true" aria-labelledby="create-project-title">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3 class="modal-title" id="create-project-title">Create New Project</h3>
+                <button class="modal-close-btn" aria-label="Close modal">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+                </button>
+            </div>
+            <form id="form-create-project">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="project-name">Project Name</label>
+                        <input type="text" id="project-name" required placeholder="e.g. Website Redesign">
+                    </div>
+                    <div class="form-group">
+                        <label for="project-description">Description</label>
+                        <textarea id="project-description" placeholder="Brief summary of project objectives..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="project-lead">Project Lead</label>
+                        <select id="project-lead" required>
+                            <option value="">Select Team Lead</option>
+                            <option value="AM">Alex Mercer</option>
+                            <option value="JD">Jane Doe</option>
+                            <option value="MK">Mike Kowalski</option>
+                            <option value="SC">Sarah Connor</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="project-percentage-input">Starting Completion (%)</label>
+                        <input type="number" id="project-percentage-input" min="0" max="100" value="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-cancel-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Project</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. Create Task Modal -->
+    <div class="modal-overlay" id="modal-create-task" role="dialog" aria-modal="true" aria-labelledby="create-task-title">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3 class="modal-title" id="create-task-title">Create New Task</h3>
+                <button class="modal-close-btn" aria-label="Close modal">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+                </button>
+            </div>
+            <form id="form-create-task">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="task-title">Task Title</label>
+                        <input type="text" id="task-title" required placeholder="e.g. Design Landing Page Mockup">
+                    </div>
+                    <div class="form-group">
+                        <label for="task-project">Project Name</label>
+                        <select id="task-project" required>
+                            <!-- Will be populated dynamically by JS, but providing fallback options -->
+                            <option value="SaaS Platform">SaaS Platform</option>
+                            <option value="Mobile App Dev">Mobile App Dev</option>
+                            <option value="SEO Strategy">SEO Strategy</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-assignee">Assign To</label>
+                        <select id="task-assignee" required>
+                            <option value="Alex M.">Alex Mercer</option>
+                            <option value="Jane D.">Jane Doe</option>
+                            <option value="Mike K.">Mike Kowalski</option>
+                            <option value="Sarah C.">Sarah Connor</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-priority">Priority</label>
+                        <select id="task-priority" required>
+                            <option value="Low">Low</option>
+                            <option value="Medium" selected>Medium</option>
+                            <option value="High">High</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-due-date">Due Date</label>
+                        <input type="date" id="task-due-date" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-cancel-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 3. Assign Task Modal -->
+    <div class="modal-overlay" id="modal-assign-task" role="dialog" aria-modal="true" aria-labelledby="assign-task-title">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3 class="modal-title" id="assign-task-title">Assign Existing Task</h3>
+                <button class="modal-close-btn" aria-label="Close modal">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+                </button>
+            </div>
+            <form id="form-assign-task">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="assign-select-task">Select Task</label>
+                        <select id="assign-select-task" required>
+                            <!-- Populate dynamically -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="assign-select-member">Assignee</label>
+                        <select id="assign-select-member" required>
+                            <option value="Alex M.">Alex Mercer</option>
+                            <option value="Jane D.">Jane Doe</option>
+                            <option value="Mike K.">Mike Kowalski</option>
+                            <option value="Sarah C.">Sarah Connor</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-cancel-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Reassign Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4. Generate Report Modal -->
+    <div class="modal-overlay" id="modal-generate-report" role="dialog" aria-modal="true" aria-labelledby="report-title">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3 class="modal-title" id="report-title">Generate System Report</h3>
+                <button class="modal-close-btn" aria-label="Close modal">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="report-form-content">
+                    <div class="form-group">
+                        <label for="report-type">Report Type</label>
+                        <select id="report-type" required>
+                            <option value="task-completion">Task Completion Summary</option>
+                            <option value="project-milestones">Project Milestone Tracking</option>
+                            <option value="team-workloads">Team Resource Workload</option>
+                            <option value="overdue-forecasting">Overdue Risk Forecasting</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="report-format">Format</label>
+                        <select id="report-format" required>
+                            <option value="PDF">PDF Document</option>
+                            <option value="Excel">Excel Spreadsheet</option>
+                            <option value="CSV">CSV Raw Data</option>
+                        </select>
+                    </div>
+                </div>
+                <!-- Simulated Generating Progress -->
+                <div id="report-generating-content" class="hidden">
+                    <div class="report-progress-container">
+                        <p id="report-status-text">Compiling task databases...</p>
+                        <div class="report-loading-bar">
+                            <div class="report-loading-fill" id="report-fill"></div>
+                        </div>
+                        <p style="font-size: 13px; color: var(--text-secondary)">This will take just a few seconds.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" id="report-footer-actions">
+                <button type="button" class="btn btn-secondary modal-cancel-btn">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btn-start-report">Generate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom JavaScript -->
+    <script src="js/manager-dashboard.js"></script>
+</body>
+</html>
