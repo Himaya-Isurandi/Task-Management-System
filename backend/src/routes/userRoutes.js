@@ -8,7 +8,7 @@ const { validate } = require('../middleware/validate');
 router.use(authenticate, checkPasswordReset);
 
 // Admin only routes
-router.get('/', authorize('Admin'), getUsers);
+router.get('/', authorize('Admin', 'Project Manager'), getUsers);
 router.post('/',
   authorize('Admin'),
   [

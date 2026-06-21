@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import StatCard from '../../components/ui/StatCard';
@@ -7,6 +7,8 @@ import Avatar from '../../components/ui/Avatar';
 import Button from '../../components/ui/Button';
 import SearchBar from '../../components/ui/SearchBar';
 import showToast from '../../components/ui/Toast';
+import api from '../../services/api';
+import useWebSocket from '../../hooks/useWebSocket';
 import { 
   Users, 
   ShieldAlert, 
@@ -26,24 +28,68 @@ export default function ManagerDashboard() {
   const [projectFilter, setProjectFilter] = useState('all');
   const [deadlineSearch, setDeadlineSearch] = useState('');
   const [deadlinePriority, setDeadlinePriority] = useState('');
+  const [projects, setProjects] = useState([]);
+  const [deadlines, setDeadlines] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock project database
-  const [projects] = useState([
-    { id: 'p1', name: 'Apollo Launchpad Portal', progress: 75, status: 'In Progress', priority: 'High' },
-    { id: 'p2', name: 'Athena Core Microservices', progress: 100, status: 'Completed', priority: 'Medium' },
-    { id: 'p3', name: 'Hermes Logistics Engine', progress: 42, status: 'In Progress', priority: 'Medium' },
-    { id: 'p4', name: 'Titan Threat Shield VPN', progress: 15, status: 'To Do', priority: 'High' },
-    { id: 'p5', name: 'Zephyr Analytics Engine', progress: 100, status: 'Completed', priority: 'Low' }
-  ]);
+  const fetchData = useCallback(async () => {
+    try {
+      const [projectsRes, usersRes, tasksRes] = await Promise.all([
+        api.get('/api/projects'),
+        api.get('/api/users'),
+        api.get('/api/tasks')
+      ]);
 
-  // Mock upcoming deadlines
-  const [deadlines] = useState([
-    { id: 'd1', title: 'Stress test connection throttling', project: 'Apollo Launchpad Portal', dueDate: '2026-06-25', priority: 'High', daysRemaining: 5, assignee: 'Alex Rivera' },
-    { id: 'd2', title: 'Write unit tests for dispatch routing', project: 'Hermes Logistics Engine', dueDate: '2026-06-18', priority: 'High', daysRemaining: -2, assignee: 'James Carter' }, // Overdue
-    { id: 'd3', title: 'Verify liquid fuel telemetry API', project: 'Apollo Launchpad Portal', dueDate: '2026-07-10', priority: 'Medium', daysRemaining: 20, assignee: 'James Carter' },
-    { id: 'd4', title: 'Draft network tunneling protocols spec', project: 'Titan Threat Shield VPN', dueDate: '2026-07-20', priority: 'High', daysRemaining: 30, assignee: 'Sarah Jenkins' },
-    { id: 'd5', title: 'Optimize Google Maps Geocoding calls', project: 'Hermes Logistics Engine', dueDate: '2026-06-15', priority: 'Low', daysRemaining: -5, assignee: 'Alex Rivera' } // Overdue
-  ]);
+      const backendProjects = projectsRes.data.projects || [];
+      const backendUsers = usersRes.data.users || [];
+      const backendTasks = tasksRes.data.tasks || [];
+
+      setProjects(backendProjects);
+      setUsers(backendUsers);
+
+      const calculateDaysRemaining = (dueDateStr) => {
+        const due = new Date(dueDateStr);
+        due.setHours(0,0,0,0);
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const diffTime = due - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays;
+      };
+
+      const incompleteTasks = backendTasks.filter(t => t.dueDate && t.status !== 'Completed');
+      const deadlinesMapped = incompleteTasks.map(t => {
+        const project = backendProjects.find(p => p.id === t.projectId);
+        return {
+          id: t.id,
+          title: t.title,
+          project: project ? project.name : 'No Project',
+          dueDate: t.dueDate,
+          priority: t.priority,
+          daysRemaining: calculateDaysRemaining(t.dueDate),
+          assignee: t.assignee ? t.assignee.name : 'Unassigned'
+        };
+      });
+      setDeadlines(deadlinesMapped);
+    } catch (err) {
+      console.error('Failed to fetch manager dashboard data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleWsMessage = useCallback((msg) => {
+    if (['task_assigned', 'status_changed', 'comment_added', 'admin_update'].includes(msg.type)) {
+      fetchData();
+    }
+  }, [fetchData]);
+
+  useWebSocket(handleWsMessage);
 
   // Filter project overview
   const filteredProjects = projects.filter(p => {
@@ -54,7 +100,9 @@ export default function ManagerDashboard() {
 
   const totalProjects = projects.length;
   const completedProjects = projects.filter(p => p.progress === 100).length;
-  const averageProgress = Math.round(projects.reduce((acc, p) => acc + p.progress, 0) / totalProjects);
+  const averageProgress = totalProjects > 0 
+    ? Math.round(projects.reduce((acc, p) => acc + p.progress, 0) / totalProjects) 
+    : 0;
 
   // Donut values
   const radius = 50;
@@ -138,12 +186,12 @@ export default function ManagerDashboard() {
           Team Operations Metrics
         </h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-          <StatCard label="Total Users" value="142" icon={Users} iconColor="#4A90E2" trend="12% vs last month" sparklinePoints="0,15 10,12 20,18 30,10 40,8 50,5 60,2" />
-          <StatCard label="Admins" value="4" icon={ShieldAlert} iconColor="#c084fc" trend="Constant" sparklinePoints="0,10 10,10 20,10 30,10 40,10 50,10 60,10" />
-          <StatCard label="Project Managers" value="12" icon={Briefcase} iconColor="#00D4FF" trend="2 new this quarter" sparklinePoints="0,15 10,15 20,12 30,12 40,10 50,8 60,6" />
-          <StatCard label="Collaborators" value="126" icon={Users} iconColor="#10D9A0" trend="8% increase" sparklinePoints="0,18 10,14 20,16 30,12 40,9 50,6 60,2" />
-          <StatCard label="Active Users" value="118" icon={UserRoundCheck} iconColor="#10D9A0" trend="92% activity rate" trendType="active" sparklinePoints="0,15 10,13 20,10 30,14 40,8 50,6 60,4" />
-          <StatCard label="Inactive Users" value="24" icon={UserX} iconColor="#FFB347" trend="4% decrease" trendType="down" sparklinePoints="0,6 10,9 20,7 30,12 40,15 50,18 60,19" />
+          <StatCard label="Total Users" value={users.length.toString()} icon={Users} iconColor="#4A90E2" trend="12% vs last month" sparklinePoints="0,15 10,12 20,18 30,10 40,8 50,5 60,2" />
+          <StatCard label="Admins" value={users.filter(u => u.role === 'Admin').length.toString()} icon={ShieldAlert} iconColor="#c084fc" trend="Constant" sparklinePoints="0,10 10,10 20,10 30,10 40,10 50,10 60,10" />
+          <StatCard label="Project Managers" value={users.filter(u => u.role === 'Project Manager').length.toString()} icon={Briefcase} iconColor="#00D4FF" trend="2 new this quarter" sparklinePoints="0,15 10,15 20,12 30,12 40,10 50,8 60,6" />
+          <StatCard label="Collaborators" value={users.filter(u => u.role === 'Collaborator').length.toString()} icon={Users} iconColor="#10D9A0" trend="8% increase" sparklinePoints="0,18 10,14 20,16 30,12 40,9 50,6 60,2" />
+          <StatCard label="Active Users" value={users.filter(u => u.isActive).length.toString()} icon={UserRoundCheck} iconColor="#10D9A0" trend="92% activity rate" trendType="active" sparklinePoints="0,15 10,13 20,10 30,14 40,8 50,6 60,4" />
+          <StatCard label="Inactive Users" value={users.filter(u => !u.isActive).length.toString()} icon={UserX} iconColor="#FFB347" trend="4% decrease" trendType="down" sparklinePoints="0,6 10,9 20,7 30,12 40,15 50,18 60,19" />
         </div>
       </div>
 

@@ -66,9 +66,9 @@ export default function Sidebar({ collapsed, setCollapsed }) {
     const role = user?.role || 'Collaborator';
     const baseLinks = [
       { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { to: '/users', label: 'Users', icon: Users, roleRestrict: ['Admin'] },
       { to: '/projects', label: role === 'Collaborator' ? 'My Projects' : 'Projects', icon: Briefcase },
-      { to: '/calendar', label: 'Calendar', icon: Calendar, roleRestrict: ['Project Manager', 'Collaborator'] },
+      { to: '/calendar', label: 'Tasks', icon: Calendar, roleRestrict: ['Project Manager', 'Collaborator'] },
+      { to: '/users', label: 'Users', icon: Users, roleRestrict: ['Admin'] },
       { to: '/notifications', label: 'Notifications', icon: Bell },
       { to: '/profile', label: 'Profile', icon: User },
       { to: '/settings', label: 'Settings', icon: Settings }
@@ -101,6 +101,49 @@ export default function Sidebar({ collapsed, setCollapsed }) {
         transition: 'width var(--transition-normal)'
       }}
     >
+      <style dangerouslySetInnerHTML={{__html: `
+        .sidebar-nav-link {
+          display: flex;
+          align-items: center;
+          gap: ${collapsed ? '0' : '12px'};
+          justify-content: ${collapsed ? 'center' : 'flex-start'};
+          padding: 12px 14px;
+          border-radius: 10px;
+          text-decoration: none;
+          font-size: 0.9rem;
+          font-weight: 500;
+          color: var(--text-secondary) !important;
+          background: transparent;
+          border-left: 3px solid transparent;
+          transition: all var(--transition-fast);
+          height: 48px; /* Consistent height for all sidebar buttons */
+          box-sizing: border-box;
+        }
+        .sidebar-nav-link:hover {
+          color: var(--secondary-accent) !important;
+          background: rgba(0, 212, 255, 0.04);
+        }
+        .sidebar-nav-link.active {
+          font-weight: 600;
+          color: var(--secondary-accent) !important;
+          background: rgba(0, 212, 255, 0.08);
+          border-left: 3px solid var(--secondary-accent);
+        }
+        .sidebar-icon-wrapper {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 20px;
+          height: 20px;
+          flex-shrink: 0;
+        }
+        .sidebar-label {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      `}} />
+
       {/* Top Header */}
       <div>
         <div style={{ 
@@ -138,24 +181,12 @@ export default function Sidebar({ collapsed, setCollapsed }) {
               <NavLink
                 key={link.to}
                 to={link.to}
-                style={({ isActive }) => ({
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: collapsed ? '0' : '12px',
-                  justifyContent: collapsed ? 'center' : 'flex-start',
-                  padding: '12px 14px',
-                  borderRadius: '10px',
-                  textDecoration: 'none',
-                  fontSize: '0.9rem',
-                  fontWeight: isActive ? '600' : '500',
-                  color: isActive ? 'var(--secondary-accent)' : 'var(--text-secondary)',
-                  background: isActive ? 'rgba(0, 212, 255, 0.08)' : 'transparent',
-                  borderLeft: isActive ? '3px solid var(--secondary-accent)' : '3px solid transparent',
-                  transition: 'all var(--transition-fast)'
-                })}
+                className="sidebar-nav-link"
               >
-                <Icon size={20} />
-                {!collapsed && <span>{link.label}</span>}
+                <span className="sidebar-icon-wrapper">
+                  <Icon size={20} />
+                </span>
+                {!collapsed && <span className="sidebar-label">{link.label}</span>}
               </NavLink>
             );
           })}
@@ -216,12 +247,15 @@ export default function Sidebar({ collapsed, setCollapsed }) {
               border: '1px solid rgba(255, 107, 107, 0.2)',
               color: 'var(--danger)',
               cursor: 'pointer',
-              padding: '8px',
+              padding: '0',
               borderRadius: '8px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'all var(--transition-fast)'
+              transition: 'all var(--transition-fast)',
+              height: '40px',
+              width: '40px',
+              flexShrink: 0
             }}
             onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--danger)'; e.currentTarget.style.color = '#fff'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 107, 107, 0.1)'; e.currentTarget.style.color = 'var(--danger)'; }}

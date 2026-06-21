@@ -3,6 +3,8 @@ const Task = require('./Task');
 const Comment = require('./Comment');
 const Notification = require('./Notification');
 const Attachment = require('./Attachment');
+const Project = require('./Project');
+const Otp = require('./Otp');
 
 // Associations
 Task.belongsTo(User, { as: 'assignee', foreignKey: 'assignedTo' });
@@ -22,4 +24,10 @@ Attachment.belongsTo(Task, { foreignKey: 'taskId' });
 Attachment.belongsTo(User, { as: 'uploader', foreignKey: 'uploadedBy' });
 Task.hasMany(Attachment, { foreignKey: 'taskId' });
 
-module.exports = { User, Task, Comment, Notification, Attachment };
+// Project associations
+Project.hasMany(Task, { foreignKey: 'projectId', as: 'tasks' });
+Task.belongsTo(Project, { foreignKey: 'projectId', as: 'project' });
+Project.belongsTo(User, { foreignKey: 'managerId', as: 'manager' });
+User.hasMany(Project, { foreignKey: 'managerId', as: 'managedProjects' });
+
+module.exports = { User, Task, Comment, Notification, Attachment, Project, Otp };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
@@ -8,6 +8,8 @@ import Avatar from '../../components/ui/Avatar';
 import KanbanBoard from '../../components/ui/KanbanBoard';
 import Modal from '../../components/ui/Modal';
 import showToast from '../../components/ui/Toast';
+import api from '../../services/api';
+import useWebSocket from '../../hooks/useWebSocket';
 import { Calendar, User, ChevronDown, ChevronUp, CheckCircle, ClipboardList, Target, TrendingUp, AlertTriangle } from 'lucide-react';
 
 export default function ManagerProjectsPage() {
@@ -15,12 +17,14 @@ export default function ManagerProjectsPage() {
   const [pmFilter, setPmFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('');
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Accordion expanded state mapping
-  const [expandedProjects, setExpandedProjects] = useState({ p1: true });
+  const [expandedProjects, setExpandedProjects] = useState({});
 
   // Main expanded sub-tabs state (tasks, team, performance)
-  const [projectTabs, setProjectTabs] = useState({ p1: 'tasks', p2: 'tasks', p3: 'tasks' });
+  const [projectTabs, setProjectTabs] = useState({});
 
   // Tasks sub-filter (All, To Do, In Progress, Completed, Overdue)
   const [taskSubFilter, setTaskSubFilter] = useState('all');
@@ -29,50 +33,40 @@ export default function ManagerProjectsPage() {
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
 
-  // Mock Database
-  const [projects, setProjects] = useState([
-    {
-      id: 'p1',
-      name: 'Apollo Launchpad Portal',
-      manager: 'Sarah Jenkins',
-      priority: 'High',
-      stage: 'Execution',
-      progress: 75,
-      startDate: '2026-05-01',
-      endDate: '2026-08-30',
-      tasks: [
-        { id: 't1', title: 'Verify liquid fuel telemetry API', description: 'Check data latency bounds under high payload conditions.', status: 'To Do', priority: 'High', dueDate: '2026-07-10', assignee: { name: 'James Carter', role: 'Collaborator' } },
-        { id: 't2', title: 'Stress test connection throttling', description: 'Determine throughput rates when DDoS throttling is active.', status: 'In Progress', priority: 'High', dueDate: '2026-07-15', assignee: { name: 'Alex Rivera', role: 'Collaborator' } },
-        { id: 't3', title: 'Implement JWT refresh token interceptors', description: 'Setup Axios request/response callbacks to handle 401 token refreshes.', status: 'Completed', priority: 'Medium', dueDate: '2026-06-18', assignee: { name: 'Alex Rivera', role: 'Collaborator' } },
-        { id: 't4', title: 'Set up automated backups on RDS', description: 'Configure cron scripts on RDS instance to write nightly dump snapshots.', status: 'Completed', priority: 'High', dueDate: '2026-06-10', assignee: { name: 'James Carter', role: 'Collaborator' } },
-        { id: 't-overdue', title: 'Audit SSL cert expiration dates', description: 'Cert renewal is approaching. Check let encrypt scripts.', status: 'In Progress', priority: 'High', dueDate: '2026-06-15', assignee: { name: 'Alex Rivera', role: 'Collaborator' } } // Overdue
-      ],
-      team: [
-        { id: 'tm1', name: 'Sarah Jenkins', role: 'Manager', tasksAssigned: 1, completed: 0, inProgress: 1, onTimePct: 100 },
-        { id: 'tm2', name: 'Alex Rivera', role: 'Collaborator', tasksAssigned: 3, completed: 1, inProgress: 2, onTimePct: 66 },
-        { id: 'tm3', name: 'James Carter', role: 'Collaborator', tasksAssigned: 2, completed: 1, inProgress: 1, onTimePct: 100 }
-      ]
-    },
-    {
-      id: 'p3',
-      name: 'Hermes Logistics Engine',
-      manager: 'Elena Rostova',
-      priority: 'Medium',
-      stage: 'Execution',
-      progress: 42,
-      startDate: '2026-04-15',
-      endDate: '2026-09-15',
-      tasks: [
-        { id: 't7', title: 'Optimize Google Maps Geocoding calls', description: 'Reduce network lookups by storing cached city coordinates.', status: 'To Do', priority: 'Medium', dueDate: '2026-07-28', assignee: { name: 'Alex Rivera', role: 'Collaborator' } },
-        { id: 't8', title: 'Write unit tests for dispatch routing', description: 'Add Mockito test cases for Dijkstra weight matrices.', status: 'In Progress', priority: 'High', dueDate: '2026-07-05', assignee: { name: 'James Carter', role: 'Collaborator' } }
-      ],
-      team: [
-        { id: 'tm4', name: 'Elena Rostova', role: 'Manager', tasksAssigned: 0, completed: 0, inProgress: 0, onTimePct: 100 },
-        { id: 'tm2', name: 'Alex Rivera', role: 'Collaborator', tasksAssigned: 1, completed: 0, inProgress: 0, onTimePct: 100 },
-        { id: 'tm3', name: 'James Carter', role: 'Collaborator', tasksAssigned: 1, completed: 0, inProgress: 1, onTimePct: 0 }
-      ]
+  const fetchData = useCallback(async () => {
+    try {
+      const { data } = await api.get('/api/projects');
+      const mapped = (data.projects || []).map((proj, idx) => {
+        if (idx === 0 && Object.keys(expandedProjects).length === 0) {
+          setExpandedProjects({ [proj.id]: true });
+        }
+        return {
+          ...proj,
+          tasks: (proj.tasks || []).map(t => ({
+            ...t,
+            assignee: t.assignee ? { name: t.assignee.name, role: t.assignee.role || 'Collaborator' } : null
+          }))
+        };
+      });
+      setProjects(mapped);
+    } catch (err) {
+      console.error('Failed to fetch projects:', err);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  }, [expandedProjects]);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleWsMessage = useCallback((msg) => {
+    if (['task_assigned', 'status_changed', 'comment_added', 'admin_update'].includes(msg.type)) {
+      fetchData();
+    }
+  }, [fetchData]);
+
+  useWebSocket(handleWsMessage);
 
   const filteredProjects = projects.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -90,27 +84,15 @@ export default function ManagerProjectsPage() {
     setProjectTabs(prev => ({ ...prev, [projId]: tab }));
   };
 
-  // Drag-and-drop state modifier
-  const handleKanbanStatusChange = (projectId, taskId, newStatus) => {
-    setProjects(prevProjects => prevProjects.map(proj => {
-      if (proj.id === projectId) {
-        const updatedTasks = proj.tasks.map(t => {
-          if (t.id === taskId) {
-            showToast.success(`Task "${t.title}" moved to ${newStatus}!`);
-            return { ...t, status: newStatus };
-          }
-          return t;
-        });
-
-        // Recompute progress percentage dynamically based on Completed tasks
-        const total = updatedTasks.length;
-        const completed = updatedTasks.filter(t => t.status === 'Completed').length;
-        const newProgress = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-        return { ...proj, tasks: updatedTasks, progress: newProgress };
-      }
-      return proj;
-    }));
+  // Drag-and-drop state modifier calling real backend API
+  const handleKanbanStatusChange = async (projectId, taskId, newStatus) => {
+    try {
+      await api.put(`/api/tasks/${taskId}`, { status: newStatus });
+      showToast.success(`Status updated to ${newStatus}`);
+      fetchData();
+    } catch (err) {
+      showToast.error(err.response?.data?.message || 'Failed to update task status');
+    }
   };
 
   const handleTaskClick = (task) => {

@@ -12,18 +12,14 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   // Step 1 Form States
-  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
-  const [phonePrefix, setPhonePrefix] = useState('+1');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [preference, setPreference] = useState('otp'); // 'otp' (Phone) or 'password' (Email)
+  const [password, setPassword] = useState('');
   const [submitting1, setSubmitting1] = useState(false);
 
   // Step 2 Verification States
   const [step, setStep] = useState(1); // 1 = Login details, 2 = Verification code
   const [tempSession, setTempSession] = useState(null);
   const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']); // For 6-box input
-  const [passwordValue, setPasswordValue] = useState(''); // For password field
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes countdown in seconds
   const [submitting2, setSubmitting2] = useState(false);
   const [successFlash, setSuccessFlash] = useState(false);
@@ -86,8 +82,8 @@ export default function LoginPage() {
   const handleStep1Submit = async (e) => {
     e.preventDefault();
 
-    if (!email) {
-      showToast.error("Please enter a valid email address.");
+    if (!email || !password) {
+      showToast.error("Please enter both email and password.");
       return;
     }
 
@@ -99,18 +95,16 @@ export default function LoginPage() {
 
     setSubmitting1(true);
     try {
-      const fullPhone = phoneNumber ? `${phonePrefix} ${phoneNumber}` : '';
-      const session = await loginStep1(username, email, fullPhone, preference);
+      const session = await loginStep1(email, password);
       
       setTempSession(session);
       setTimeLeft(300); // Reset timer to 5 minutes
       setStep(2);
+      setVerificationCode(['', '', '', '', '', '']); // Reset code input
       
-      const method = preference === 'otp' ? 'phone' : 'email';
-      const hintCode = preference === 'otp' ? ' (Use code: 123456)' : ' (Use password: Admin@1234)';
-      showToast.success(`Verification sent! Check your ${method}. Expires in 5:00 minutes.${hintCode}`);
+      showToast.success("Verification code sent! Please check your registered email or backend console.");
     } catch (err) {
-      showToast.error("Login Failed — Verification could not be sent.");
+      showToast.error(err.response?.data?.message || "Login Failed — Invalid credentials.");
     } finally {
       setSubmitting1(false);
     }
@@ -119,10 +113,10 @@ export default function LoginPage() {
   // Step 2 Submit
   const handleStep2Submit = async (e) => {
     e.preventDefault();
-    const code = preference === 'otp' ? verificationCode.join('') : passwordValue;
+    const code = verificationCode.join('');
 
-    if (!code) {
-      showToast.error("Please enter your verification code or password.");
+    if (!code || code.length !== 6) {
+      showToast.error("Please enter the 6-digit verification code.");
       return;
     }
 
@@ -137,8 +131,7 @@ export default function LoginPage() {
         navigate('/dashboard');
       }, 1500);
     } catch (err) {
-      const displayName = tempSession?.userDetails?.name || 'User';
-      showToast.error(`Try again, ${displayName}. Code incorrect or expired.`);
+      showToast.error(err.response?.data?.message || "Try again. Verification code incorrect or expired.");
     } finally {
       setSubmitting2(false);
     }
@@ -211,21 +204,6 @@ export default function LoginPage() {
         {step === 1 && (
           <form onSubmit={handleStep1Submit}>
             <div className="input-group">
-              <span className="input-label">Username</span>
-              <div className="input-field-prefixed">
-                <span className="input-prefix" style={{ display: 'flex', alignItems: 'center' }}>
-                  <UserIcon size={16} />
-                </span>
-                <input 
-                  type="text" 
-                  placeholder="e.g. system_admin" 
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="input-group">
               <span className="input-label">Email Address</span>
               <div className="input-field-prefixed">
                 <span className="input-prefix" style={{ display: 'flex', alignItems: 'center' }}>
@@ -241,49 +219,19 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="input-group">
-              <span className="input-label">Phone Number</span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <select 
-                  value={phonePrefix} 
-                  onChange={(e) => setPhonePrefix(e.target.value)}
-                  className="input-field"
-                  style={{ width: '90px', padding: '12px 8px', textAlign: 'center' }}
-                >
-                  <option value="+1">+1</option>
-                  <option value="+44">+44</option>
-                  <option value="+91">+91</option>
-                  <option value="+61">+61</option>
-                  <option value="+81">+81</option>
-                </select>
-                <div className="input-field-prefixed" style={{ flex: 1 }}>
-                  <span className="input-prefix" style={{ display: 'flex', alignItems: 'center' }}>
-                    <Phone size={16} />
-                  </span>
-                  <input 
-                    type="tel" 
-                    placeholder="555-0199" 
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Preference pill toggle */}
-            <span className="input-label" style={{ marginBottom: '8px', display: 'block' }}>Delivery Method</span>
-            <div className="pill-toggle">
-              <div 
-                className={`pill-toggle-option ${preference === 'otp' ? 'active' : ''}`}
-                onClick={() => setPreference('otp')}
-              >
-                Send OTP to Phone
-              </div>
-              <div 
-                className={`pill-toggle-option ${preference === 'password' ? 'active' : ''}`}
-                onClick={() => setPreference('password')}
-              >
-                Send Password to Email
+            <div className="input-group" style={{ marginBottom: '24px' }}>
+              <span className="input-label">Password</span>
+              <div className="input-field-prefixed">
+                <span className="input-prefix" style={{ display: 'flex', alignItems: 'center' }}>
+                  <Lock size={16} />
+                </span>
+                <input 
+                  type="password" 
+                  placeholder="Enter password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
               </div>
             </div>
 
@@ -308,56 +256,35 @@ export default function LoginPage() {
                 Verify Security Key
               </h4>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                {preference === 'otp' 
-                  ? `Enter the 6-digit OTP code sent to your phone number.` 
-                  : `Enter the administrator security password sent to ${tempSession?.userDetails?.email}.`
-                }
+                Enter the 6-digit code sent to your email.
               </p>
             </div>
 
-            {preference === 'otp' ? (
-              // 6-digit OTP fields
-              <div className="input-group" style={{ marginBottom: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                  {verificationCode.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      ref={(el) => (otpInputRefs.current[idx] = el)}
-                      type="text"
-                      maxLength="1"
-                      className="input-field"
-                      style={{ 
-                        width: '50px', 
-                        height: '52px', 
-                        textAlign: 'center', 
-                        fontSize: '1.25rem', 
-                        fontWeight: '700',
-                        padding: 0
-                      }}
-                      value={digit}
-                      onChange={(e) => handleOtpChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ) : (
-              // Password input
-              <div className="input-group" style={{ marginBottom: '24px' }}>
-                <span className="input-label">Access Password</span>
-                <div className="input-field-prefixed">
-                  <span className="input-prefix" style={{ display: 'flex', alignItems: 'center' }}>
-                    <Lock size={16} />
-                  </span>
-                  <input 
-                    type="password" 
-                    placeholder="Enter security password" 
-                    value={passwordValue}
-                    onChange={(e) => setPasswordValue(e.target.value)}
+            {/* 6-digit OTP fields */}
+            <div className="input-group" style={{ marginBottom: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                {verificationCode.map((digit, idx) => (
+                  <input
+                    key={idx}
+                    ref={(el) => (otpInputRefs.current[idx] = el)}
+                    type="text"
+                    maxLength="1"
+                    className="input-field"
+                    style={{ 
+                      width: '50px', 
+                      height: '52px', 
+                      textAlign: 'center', 
+                      fontSize: '1.25rem', 
+                      fontWeight: '700',
+                      padding: 0
+                    }}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(idx, e.target.value)}
+                    onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                   />
-                </div>
+                ))}
               </div>
-            )}
+            </div>
 
             {/* Countdown timer */}
             <div style={{ 

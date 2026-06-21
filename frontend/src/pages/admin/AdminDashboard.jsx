@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import StatCard from '../../components/ui/StatCard';
 import ProgressBar from '../../components/ui/ProgressBar';
+import api from '../../services/api';
+import useWebSocket from '../../hooks/useWebSocket';
 import { 
   Users, 
   ShieldAlert, 
@@ -15,15 +17,36 @@ import {
 
 export default function AdminDashboard() {
   const [projectFilter, setProjectFilter] = useState('all'); // 'all', 'completed', 'active'
+  const [projects, setProjects] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Predefined mockup projects
-  const [projects] = useState([
-    { id: 'p1', name: 'Apollo Launchpad Portal', progress: 75, status: 'In Progress', priority: 'High' },
-    { id: 'p2', name: 'Athena Core Microservices', progress: 100, status: 'Completed', priority: 'Medium' },
-    { id: 'p3', name: 'Hermes Logistics Engine', progress: 42, status: 'In Progress', priority: 'Medium' },
-    { id: 'p4', name: 'Titan Threat Shield VPN', progress: 15, status: 'To Do', priority: 'High' },
-    { id: 'p5', name: 'Zephyr Analytics Engine', progress: 100, status: 'Completed', priority: 'Low' }
-  ]);
+  const fetchData = useCallback(async () => {
+    try {
+      const [projectsRes, usersRes] = await Promise.all([
+        api.get('/api/projects'),
+        api.get('/api/users')
+      ]);
+      setProjects(projectsRes.data.projects || []);
+      setUsers(usersRes.data.users || []);
+    } catch (err) {
+      console.error('Failed to fetch admin dashboard data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleWsMessage = useCallback((msg) => {
+    if (['task_assigned', 'status_changed', 'admin_update'].includes(msg.type)) {
+      fetchData();
+    }
+  }, [fetchData]);
+
+  useWebSocket(handleWsMessage);
 
   // Compute stats
   const filteredProjects = projects.filter(p => {
@@ -34,7 +57,9 @@ export default function AdminDashboard() {
 
   const totalProjects = projects.length;
   const completedProjects = projects.filter(p => p.progress === 100).length;
-  const averageProgress = Math.round(projects.reduce((acc, p) => acc + p.progress, 0) / totalProjects);
+  const averageProgress = totalProjects > 0 
+    ? Math.round(projects.reduce((acc, p) => acc + p.progress, 0) / totalProjects) 
+    : 0;
 
   // Donut chart math
   const radius = 50;
@@ -176,7 +201,7 @@ export default function AdminDashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
           <StatCard 
             label="Total Users" 
-            value="142" 
+            value={users.length.toString()} 
             icon={Users} 
             iconColor="#4A90E2" 
             trend="12% vs last month"
@@ -185,7 +210,7 @@ export default function AdminDashboard() {
           />
           <StatCard 
             label="Admins" 
-            value="4" 
+            value={users.filter(u => u.role === 'Admin').length.toString()} 
             icon={ShieldAlert} 
             iconColor="#c084fc" 
             trend="Constant"
@@ -194,7 +219,7 @@ export default function AdminDashboard() {
           />
           <StatCard 
             label="Project Managers" 
-            value="12" 
+            value={users.filter(u => u.role === 'Project Manager').length.toString()} 
             icon={Briefcase} 
             iconColor="#00D4FF" 
             trend="2 new this quarter"
@@ -203,7 +228,7 @@ export default function AdminDashboard() {
           />
           <StatCard 
             label="Collaborators" 
-            value="126" 
+            value={users.filter(u => u.role === 'Collaborator').length.toString()} 
             icon={Users} 
             iconColor="#10D9A0" 
             trend="8% increase"
@@ -212,7 +237,7 @@ export default function AdminDashboard() {
           />
           <StatCard 
             label="Active Users" 
-            value="118" 
+            value={users.filter(u => u.isActive).length.toString()} 
             icon={UserRoundCheck} 
             iconColor="#10D9A0" 
             trend="92% activity rate"
@@ -221,7 +246,7 @@ export default function AdminDashboard() {
           />
           <StatCard 
             label="Inactive Users" 
-            value="24" 
+            value={users.filter(u => !u.isActive).length.toString()} 
             icon={UserX} 
             iconColor="#FFB347" 
             trend="4% decrease"

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import ProgressBar from '../../components/ui/ProgressBar';
@@ -6,50 +6,54 @@ import SearchBar from '../../components/ui/SearchBar';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import showToast from '../../components/ui/Toast';
+import api from '../../services/api';
+import useWebSocket from '../../hooks/useWebSocket';
+import { useAuth } from '../../context/AuthContext';
 import { Calendar, User, MessageSquare, Paperclip, Upload, Send } from 'lucide-react';
 
 export default function MyProjectsPage() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [pmFilter, setPmFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('');
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Comment Drawer states
   const [isCommentDrawerOpen, setIsCommentDrawerOpen] = useState(false);
   const [activeTask, setActiveTask] = useState(null);
   const [newComment, setNewComment] = useState('');
 
-  // Mock projects database scoped to collaborator (Alex Rivera)
-  const [projects, setProjects] = useState([
-    {
-      id: 'p1',
-      name: 'Apollo Launchpad Portal',
-      manager: 'Sarah Jenkins',
-      priority: 'High',
-      stage: 'Execution',
-      progress: 50, // 2 out of 4 tasks completed
-      startDate: '2026-05-01',
-      endDate: '2026-08-30',
-      tasks: [
-        { id: 't2', title: 'Stress test connection throttling', status: 'In Progress', priority: 'High', dueDate: '2026-07-15', comments: [{ id: 1, user: 'Sarah Jenkins', text: 'Please ensure this is tested with 10k connections.', time: '2h ago' }] },
-        { id: 't3', title: 'Implement JWT refresh token interceptors', status: 'Completed', priority: 'Medium', dueDate: '2026-06-18', comments: [] },
-        { id: 't-overdue', title: 'Audit SSL cert expiration dates', status: 'In Progress', priority: 'High', dueDate: '2026-06-15', comments: [] }
-      ]
-    },
-    {
-      id: 'p3',
-      name: 'Hermes Logistics Engine',
-      manager: 'Elena Rostova',
-      priority: 'Medium',
-      stage: 'Execution',
-      progress: 0, // 0 out of 1 tasks completed
-      startDate: '2026-04-15',
-      endDate: '2026-09-15',
-      tasks: [
-        { id: 't7', title: 'Optimize Google Maps Geocoding calls', status: 'To Do', priority: 'Medium', dueDate: '2026-07-28', comments: [] }
-      ]
+  const fetchData = useCallback(async () => {
+    try {
+      const { data } = await api.get('/api/projects');
+      const mapped = (data.projects || []).map(proj => ({
+        ...proj,
+        tasks: (proj.tasks || []).map(t => ({
+          ...t,
+          comments: []
+        }))
+      }));
+      setProjects(mapped);
+    } catch (err) {
+      console.error('Failed to fetch projects:', err);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleWsMessage = useCallback((msg) => {
+    if (['task_assigned', 'status_changed', 'comment_added'].includes(msg.type)) {
+      fetchData();
+    }
+  }, [fetchData]);
+
+  useWebSocket(handleWsMessage);
 
   // Filters logic
   const filteredProjects = projects.filter(p => {
@@ -61,75 +65,85 @@ export default function MyProjectsPage() {
   });
 
   // Inline status toggle handler
-  const handleStatusChange = (projectId, taskId, newStatus) => {
-    setProjects(prevProjects => prevProjects.map(proj => {
-      if (proj.id === projectId) {
-        const updatedTasks = proj.tasks.map(t => {
-          if (t.id === taskId) {
-            showToast.success(`Status updated to "${newStatus}" for task: "${t.title}"`);
-            return { ...t, status: newStatus };
-          }
-          return t;
-        });
-
-        // Recalculate project progress
-        const total = updatedTasks.length;
-        const completed = updatedTasks.filter(t => t.status === 'Completed').length;
-        const newProgress = Math.round((completed / total) * 100);
-
-        return { ...proj, tasks: updatedTasks, progress: newProgress };
-      }
-      return proj;
-    }));
-  };
-
-  // Mock file upload handler
-  const handleFileUpload = (taskTitle, e) => {
-    const file = e.target.files[0];
-    if (file) {
-      showToast.success(`Successfully uploaded "${file.name}" to task "${taskTitle}"!`);
+  const handleStatusChange = async (projectId, taskId, newStatus) => {
+    try {
+      await api.put(`/api/tasks/${taskId}`, { status: newStatus });
+      showToast.success(`Status updated to "${newStatus}"`);
+      fetchData();
+    } catch (err) {
+      showToast.error(err.response?.data?.message || 'Failed to update status');
     }
   };
 
-  const handleOpenComments = (task) => {
-    setActiveTask(task);
-    setNewComment('');
-    setIsCommentDrawerOpen(true);
+  // Real file upload handler
+  const handleFileUpload = async (taskId, taskTitle, e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      await api.post(`/api/tasks/${taskId}/attachments`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      showToast.success(`Successfully uploaded "${file.name}" to task "${taskTitle}"!`);
+      fetchData();
+    } catch (err) {
+      showToast.error(err.response?.data?.message || 'Failed to upload attachment');
+    }
+  };
+
+  const handleOpenComments = async (task) => {
+    try {
+      const { data } = await api.get(`/api/tasks/${task.id}`);
+      const commentsMapped = (data.task.Comments || []).map(c => ({
+        id: c.id,
+        user: c.User ? c.User.name : 'Unknown',
+        text: c.content,
+        time: new Date(c.createdAt).toLocaleDateString() + ' ' + new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }));
+      setActiveTask({
+        ...data.task,
+        comments: commentsMapped
+      });
+      setNewComment('');
+      setIsCommentDrawerOpen(true);
+    } catch (err) {
+      showToast.error('Failed to load task comments');
+    }
   };
 
   // Submit comment handler
-  const handlePostComment = (e) => {
+  const handleAddComment = async (e) => {
     e.preventDefault();
     if (!newComment.trim()) return;
 
-    const newCommentObj = {
-      id: Date.now(),
-      user: 'Alex Rivera', // Logged in collaborator
-      text: newComment,
-      time: 'Just now'
-    };
+    try {
+      await api.post(`/api/tasks/${activeTask.id}/comments`, { content: newComment });
+      showToast.success('Comment added!');
+      setNewComment('');
 
-    // Update locally inside project state
-    setProjects(prevProjects => prevProjects.map(proj => {
-      const updatedTasks = proj.tasks.map(t => {
-        if (t.id === activeTask.id) {
-          const updatedComments = [...(t.comments || []), newCommentObj];
-          // Update the active task object so drawer renders it
-          setActiveTask(prev => ({ ...prev, comments: updatedComments }));
-          return { ...t, comments: updatedComments };
-        }
-        return t;
+      const { data } = await api.get(`/api/tasks/${activeTask.id}`);
+      const commentsMapped = (data.task.Comments || []).map(c => ({
+        id: c.id,
+        user: c.User ? c.User.name : 'Unknown',
+        text: c.content,
+        time: new Date(c.createdAt).toLocaleDateString() + ' ' + new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }));
+      setActiveTask({
+        ...data.task,
+        comments: commentsMapped
       });
-      return { ...proj, tasks: updatedTasks };
-    }));
-
-    setNewComment('');
-    showToast.success('Comment posted successfully!');
+      fetchData();
+    } catch (err) {
+      showToast.error('Failed to add comment');
+    }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-      
+
       {/* HEADER ROW */}
       <div>
         <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>My Assigned Projects</h3>
@@ -140,14 +154,14 @@ export default function MyProjectsPage() {
       <Card style={{ padding: '16px' }}>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ flex: 1, minWidth: '240px' }}>
-            <SearchBar 
-              placeholder="Search project name..." 
+            <SearchBar
+              placeholder="Search project name..."
               value={searchQuery}
               onChange={(val) => setSearchQuery(val)}
             />
           </div>
-          <select 
-            className="input-field" 
+          <select
+            className="input-field"
             style={{ width: '180px', padding: '10px 12px' }}
             value={pmFilter}
             onChange={(e) => setPmFilter(e.target.value)}
@@ -156,8 +170,8 @@ export default function MyProjectsPage() {
             <option value="Sarah Jenkins">Sarah Jenkins</option>
             <option value="Elena Rostova">Elena Rostova</option>
           </select>
-          <select 
-            className="input-field" 
+          <select
+            className="input-field"
             style={{ width: '150px', padding: '10px 12px' }}
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
@@ -167,8 +181,8 @@ export default function MyProjectsPage() {
             <option value="Medium">Medium</option>
             <option value="Low">Low</option>
           </select>
-          <select 
-            className="input-field" 
+          <select
+            className="input-field"
             style={{ width: '160px', padding: '10px 12px' }}
             value={stageFilter}
             onChange={(e) => setStageFilter(e.target.value)}
@@ -183,7 +197,11 @@ export default function MyProjectsPage() {
 
       {/* PROJECT ASSIGNMENT LIST */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
-        {filteredProjects.length === 0 ? (
+        {loading ? (
+          <Card style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+            Loading projects...
+          </Card>
+        ) : filteredProjects.length === 0 ? (
           <Card style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
             No assigned projects found matching filters.
           </Card>
@@ -195,7 +213,7 @@ export default function MyProjectsPage() {
 
             return (
               <Card key={proj.id} style={{ padding: '24px 30px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                
+
                 {/* PROJECT SUMMARY CARD */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '15px' }}>
                   <div>
@@ -205,7 +223,7 @@ export default function MyProjectsPage() {
                     <div style={{ display: 'flex', gap: '15px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                       <span>Manager: <strong>{proj.manager}</strong></span>
                       <span>Target Date: <strong>{proj.endDate}</strong></span>
-                      <Badge type={proj.priority.toLowerCase() === 'high' ? 'danger' : 'medium'}>{proj.priority}</Badge>
+                      <Badge type={proj.priority?.toLowerCase() === 'high' ? 'danger' : 'medium'}>{proj.priority}</Badge>
                     </div>
                   </div>
 
@@ -260,14 +278,14 @@ export default function MyProjectsPage() {
                             <td><Badge type={task.priority}>{task.priority}</Badge></td>
                             <td>
                               {/* Status update dropdown selector */}
-                              <select 
+                              <select
                                 value={task.status}
                                 onChange={(e) => handleStatusChange(proj.id, task.id, e.target.value)}
                                 className="input-field"
-                                style={{ 
-                                  width: '140px', 
-                                  padding: '6px 10px', 
-                                  fontSize: '0.8rem', 
+                                style={{
+                                  width: '140px',
+                                  padding: '6px 10px',
+                                  fontSize: '0.8rem',
                                   fontWeight: 600,
                                   borderColor: task.status === 'Completed' ? 'var(--success)' : task.status === 'In Progress' ? 'var(--warning)' : 'var(--card-border)',
                                   color: task.status === 'Completed' ? 'var(--success)' : task.status === 'In Progress' ? 'var(--warning)' : 'inherit'
@@ -280,9 +298,9 @@ export default function MyProjectsPage() {
                             </td>
                             <td>
                               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                                
+
                                 {/* Comment button */}
-                                <Button 
+                                <Button
                                   variant="secondary"
                                   onClick={() => handleOpenComments(task)}
                                   style={{ padding: '6px 10px', fontSize: '0.75rem', gap: '4px' }}
@@ -311,10 +329,10 @@ export default function MyProjectsPage() {
                                   transition: 'all 0.2s'
                                 }}>
                                   <Upload size={13} /> Deliverable
-                                  <input 
-                                    type="file" 
-                                    style={{ display: 'none' }} 
-                                    onChange={(e) => handleFileUpload(task.title, e)}
+                                  <input
+                                    type="file"
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => handleFileUpload(task.id, task.title, e)}
                                   />
                                 </label>
 
@@ -342,7 +360,7 @@ export default function MyProjectsPage() {
         width="480px"
       >
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          
+
           {/* Comments List */}
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px', paddingRight: '4px' }}>
             {(!activeTask?.comments || activeTask.comments.length === 0) ? (
@@ -351,9 +369,9 @@ export default function MyProjectsPage() {
               </div>
             ) : (
               activeTask.comments.map(c => {
-                const isMe = c.user === 'Alex Rivera';
+                const isMe = c.user === user?.name;
                 return (
-                  <div 
+                  <div
                     key={c.id}
                     style={{
                       display: 'flex',
@@ -382,7 +400,7 @@ export default function MyProjectsPage() {
           </div>
 
           {/* Comment Form input */}
-          <form onSubmit={handlePostComment} style={{ borderTop: '1px solid rgba(74, 144, 226, 0.15)', paddingTop: '16px' }}>
+          <form onSubmit={handleAddComment} style={{ borderTop: '1px solid rgba(74, 144, 226, 0.15)', paddingTop: '16px' }}>
             <div style={{ display: 'flex', gap: '8px' }}>
               <input
                 type="text"

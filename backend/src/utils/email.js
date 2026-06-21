@@ -34,4 +34,17 @@ const sendPasswordResetEmail = async (to, name) => {
   });
 };
 
-module.exports = { sendWelcomeEmail, sendPasswordResetEmail };
+const send2faEmail = async (to, code) => {
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    to,
+    subject: 'Your TMS Verification Code',
+    html: `
+      <h2>Two-Factor Authentication Code</h2>
+      <p>Please use the following 6-digit code to log in to the Task Management System. This code will expire in 5 minutes.</p>
+      <h1 style="font-size: 2.5rem; letter-spacing: 5px; font-family: monospace; font-weight: bold; margin: 20px 0; color: #4F46E5;">${code}</h1>
+    `,
+  });
+};
+
+module.exports = { sendWelcomeEmail, sendPasswordResetEmail, send2faEmail };

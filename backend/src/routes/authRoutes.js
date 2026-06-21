@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { body } = require('express-validator');
-const { login, refresh, logout, resetPassword, getMe } = require('../controllers/authController');
+const { login, refresh, logout, resetPassword, getMe, verify2fa, updateProfile } = require('../controllers/authController');
 const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 
@@ -46,5 +46,16 @@ router.put('/reset-password',
   ],
   resetPassword
 );
+
+// 2FA and Profile endpoints
+router.post('/2fa/verify',
+  [
+    body('email').isEmail().withMessage('Valid email required'),
+    body('code').isLength({ min: 6, max: 6 }).withMessage('Verification code must be 6 digits'),
+    validate,
+  ],
+  verify2fa
+);
+router.put('/profile', authenticate, updateProfile);
 
 module.exports = router;

@@ -20,6 +20,7 @@ const taskRoutes = require('./routes/taskRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const attachmentRoutes = require('./routes/attachmentRoutes'); // NEW
 const adminRoutes = require('./routes/adminRoutes'); // NEW
+const projectRoutes = require('./routes/projectRoutes');
 
 const app = express();
 
@@ -64,6 +65,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api', attachmentRoutes); // NEW - provides /api/tasks/:id/attachments and /api/attachments/:id
 app.use('/api/admin', adminRoutes); // NEW
+app.use('/api/projects', projectRoutes);
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date() }));

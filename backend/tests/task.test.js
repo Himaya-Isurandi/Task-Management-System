@@ -19,14 +19,21 @@ beforeAll(async () => {
   const collaborator = await User.create({ name: 'Collab', email: 'collab@test.com', password: 'Collab@123', role: 'Collaborator', mustResetPassword: false });
   collaboratorId = collaborator.id;
 
-  const adminLogin = await request(app).post('/api/auth/login').send({ email: 'admin@test.com', password: 'Admin@1234' });
-  adminToken = adminLogin.body.accessToken;
+  const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.111111);
 
-  const pmLogin = await request(app).post('/api/auth/login').send({ email: 'pm@test.com', password: 'Pm@12345' });
-  pmToken = pmLogin.body.accessToken;
+  await request(app).post('/api/auth/login').send({ email: 'admin@test.com', password: 'Admin@1234' });
+  const adminVerify = await request(app).post('/api/auth/2fa/verify').send({ email: 'admin@test.com', code: '199999' });
+  adminToken = adminVerify.body.accessToken;
 
-  const collabLogin = await request(app).post('/api/auth/login').send({ email: 'collab@test.com', password: 'Collab@123' });
-  collaboratorToken = collabLogin.body.accessToken;
+  await request(app).post('/api/auth/login').send({ email: 'pm@test.com', password: 'Pm@12345' });
+  const pmVerify = await request(app).post('/api/auth/2fa/verify').send({ email: 'pm@test.com', code: '199999' });
+  pmToken = pmVerify.body.accessToken;
+
+  await request(app).post('/api/auth/login').send({ email: 'collab@test.com', password: 'Collab@123' });
+  const collabVerify = await request(app).post('/api/auth/2fa/verify').send({ email: 'collab@test.com', code: '199999' });
+  collaboratorToken = collabVerify.body.accessToken;
+
+  randomSpy.mockRestore();
 });
 
 afterAll(async () => {

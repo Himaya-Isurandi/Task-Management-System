@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import SearchBar from '../../components/ui/SearchBar';
 import ProgressBar from '../../components/ui/ProgressBar';
 import Avatar from '../../components/ui/Avatar';
+import api from '../../services/api';
+import useWebSocket from '../../hooks/useWebSocket';
 import { Calendar, User, ChevronDown, ChevronUp, CheckCircle, ClipboardList, Clock, Users as UsersIcon } from 'lucide-react';
 
 export default function ProjectsPage() {
@@ -12,116 +14,50 @@ export default function ProjectsPage() {
   const [pmFilter, setPmFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('');
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Accordion open state map
-  const [expandedProjects, setExpandedProjects] = useState({
-    p1: true, // Expand the first project by default
-  });
+  const [expandedProjects, setExpandedProjects] = useState({});
 
   // Tab state per project (To Do, In Progress, Completed, Team)
-  const [projectTabs, setProjectTabs] = useState({
-    p1: 'todo',
-    p2: 'todo',
-    p3: 'todo',
-    p4: 'todo',
-    p5: 'todo'
-  });
+  const [projectTabs, setProjectTabs] = useState({});
 
-  // Mock project database with sub-entities
-  const [projects] = useState([
-    {
-      id: 'p1',
-      name: 'Apollo Launchpad Portal',
-      manager: 'Sarah Jenkins',
-      priority: 'High',
-      stage: 'Execution',
-      progress: 75,
-      startDate: '2026-05-01',
-      endDate: '2026-08-30',
-      tasks: [
-        { id: 't1', title: 'Verify liquid fuel telemetry API', status: 'To Do', priority: 'High', dueDate: '2026-07-10', assignee: 'James Carter' },
-        { id: 't2', title: 'Stress test connection throttling', status: 'In Progress', priority: 'High', dueDate: '2026-07-15', assignee: 'Alex Rivera' },
-        { id: 't3', title: 'Implement JWT refresh token interceptors', status: 'Completed', priority: 'Medium', dueDate: '2026-06-18', assignee: 'Alex Rivera' },
-        { id: 't4', title: 'Set up automated backups on RDS', status: 'Completed', priority: 'High', dueDate: '2026-06-10', assignee: 'James Carter' }
-      ],
-      team: [
-        { id: 'tm1', name: 'Sarah Jenkins', role: 'Manager', status: 'Active' },
-        { id: 'tm2', name: 'Alex Rivera', role: 'Collaborator', status: 'Active' },
-        { id: 'tm3', name: 'James Carter', role: 'Collaborator', status: 'Active' }
-      ]
-    },
-    {
-      id: 'p2',
-      name: 'Athena Core Microservices',
-      manager: 'Sarah Jenkins',
-      priority: 'Medium',
-      stage: 'Completed',
-      progress: 100,
-      startDate: '2026-01-10',
-      endDate: '2026-05-20',
-      tasks: [
-        { id: 't5', title: 'Refactor database migration schema', status: 'Completed', priority: 'Medium', dueDate: '2026-05-15', assignee: 'James Carter' },
-        { id: 't6', title: 'Create Swagger API docs', status: 'Completed', priority: 'Low', dueDate: '2026-05-20', assignee: 'Sarah Jenkins' }
-      ],
-      team: [
-        { id: 'tm1', name: 'Sarah Jenkins', role: 'Manager', status: 'Active' },
-        { id: 'tm3', name: 'James Carter', role: 'Collaborator', status: 'Active' }
-      ]
-    },
-    {
-      id: 'p3',
-      name: 'Hermes Logistics Engine',
-      manager: 'Elena Rostova',
-      priority: 'Medium',
-      stage: 'Execution',
-      progress: 42,
-      startDate: '2026-04-15',
-      endDate: '2026-09-15',
-      tasks: [
-        { id: 't7', title: 'Optimize Google Maps Geocoding calls', status: 'To Do', priority: 'Medium', dueDate: '2026-07-28', assignee: 'Alex Rivera' },
-        { id: 't8', title: 'Write unit tests for dispatch routing', status: 'In Progress', priority: 'High', dueDate: '2026-07-05', assignee: 'James Carter' }
-      ],
-      team: [
-        { id: 'tm4', name: 'Elena Rostova', role: 'Manager', status: 'Active' },
-        { id: 'tm2', name: 'Alex Rivera', role: 'Collaborator', status: 'Active' },
-        { id: 'tm3', name: 'James Carter', role: 'Collaborator', status: 'Active' }
-      ]
-    },
-    {
-      id: 'p4',
-      name: 'Titan Threat Shield VPN',
-      manager: 'Sarah Jenkins',
-      priority: 'High',
-      stage: 'Planning',
-      progress: 15,
-      startDate: '2026-06-01',
-      endDate: '2026-12-15',
-      tasks: [
-        { id: 't9', title: 'Draft network tunneling protocols specification', status: 'In Progress', priority: 'High', dueDate: '2026-07-20', assignee: 'Sarah Jenkins' }
-      ],
-      team: [
-        { id: 'tm1', name: 'Sarah Jenkins', role: 'Manager', status: 'Active' },
-        { id: 'tm5', name: 'Marcus Aurelius', role: 'Collaborator', status: 'Inactive' }
-      ]
-    },
-    {
-      id: 'p5',
-      name: 'Zephyr Analytics Engine',
-      manager: 'Elena Rostova',
-      priority: 'Low',
-      stage: 'Completed',
-      progress: 100,
-      startDate: '2026-02-01',
-      endDate: '2026-06-01',
-      tasks: [
-        { id: 't10', title: 'Setup Elasticsearch aggregation indices', status: 'Completed', priority: 'Low', dueDate: '2026-05-30', assignee: 'James Carter' }
-      ],
-      team: [
-        { id: 'tm4', name: 'Elena Rostova', role: 'Manager', status: 'Active' },
-        { id: 'tm3', name: 'James Carter', role: 'Collaborator', status: 'Active' }
-      ]
+  const fetchData = useCallback(async () => {
+    try {
+      const { data } = await api.get('/api/projects');
+      const mapped = (data.projects || []).map((proj, idx) => {
+        // Expand the first project by default on first load
+        if (idx === 0 && Object.keys(expandedProjects).length === 0) {
+          setExpandedProjects({ [proj.id]: true });
+        }
+        return {
+          ...proj,
+          tasks: (proj.tasks || []).map(t => ({
+            ...t,
+            assignee: t.assignee ? t.assignee.name : '—'
+          }))
+        };
+      });
+      setProjects(mapped);
+    } catch (err) {
+      console.error('Failed to fetch projects:', err);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  }, [expandedProjects]);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleWsMessage = useCallback((msg) => {
+    if (['task_assigned', 'status_changed', 'comment_added', 'admin_update'].includes(msg.type)) {
+      fetchData();
+    }
+  }, [fetchData]);
+
+  useWebSocket(handleWsMessage);
 
   // Filtering Logic
   const filteredProjects = projects.filter(p => {

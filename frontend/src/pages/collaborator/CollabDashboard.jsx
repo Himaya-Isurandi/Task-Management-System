@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import StatCard from '../../components/ui/StatCard';
@@ -6,6 +6,8 @@ import Button from '../../components/ui/Button';
 import SearchBar from '../../components/ui/SearchBar';
 import Avatar from '../../components/ui/Avatar';
 import showToast from '../../components/ui/Toast';
+import api from '../../services/api';
+import useWebSocket from '../../hooks/useWebSocket';
 import { 
   CheckSquare, 
   MessageSquare, 
@@ -20,27 +22,84 @@ import {
 export default function CollabDashboard() {
   const [deadlineSearch, setDeadlineSearch] = useState('');
   const [deadlinePriority, setDeadlinePriority] = useState('');
+  const [projects, setProjects] = useState([]);
+  const [myDeadlines, setMyDeadlines] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock projects user participates in
-  const [projects] = useState([
-    { id: 'p1', name: 'Apollo Launchpad Portal', role: 'Lead Frontend Developer', progress: 75, todo: 1, progressCount: 2, done: 2 },
-    { id: 'p3', name: 'Hermes Logistics Engine', role: 'UI Engineer', progress: 42, todo: 1, progressCount: 0, done: 0 }
-  ]);
+  const fetchData = useCallback(async () => {
+    try {
+      const [projectsRes, tasksRes] = await Promise.all([
+        api.get('/api/projects'),
+        api.get('/api/tasks')
+      ]);
 
-  // Mock deadlines specifically assigned to this collaborator (Alex Rivera)
-  const [myDeadlines] = useState([
-    { id: 'd1', title: 'Stress test connection throttling', project: 'Apollo Launchpad Portal', dueDate: '2026-06-25', priority: 'High', daysRemaining: 5 },
-    { id: 'd2', title: 'Implement JWT refresh token interceptors', project: 'Apollo Launchpad Portal', dueDate: '2026-06-18', priority: 'Medium', daysRemaining: -2 }, // Overdue
-    { id: 'd3', title: 'Optimize Google Maps Geocoding calls', project: 'Hermes Logistics Engine', dueDate: '2026-07-28', priority: 'Medium', daysRemaining: 38 }
-  ]);
+      const backendProjects = projectsRes.data.projects || [];
+      const backendTasks = tasksRes.data.tasks || [];
 
-  // Filter deadlines
-  const filteredDeadlines = myDeadlines.filter(d => {
-    const matchesSearch = d.title.toLowerCase().includes(deadlineSearch.toLowerCase()) || 
-                          d.project.toLowerCase().includes(deadlineSearch.toLowerCase());
-    const matchesPriority = deadlinePriority ? d.priority === deadlinePriority : true;
-    return matchesSearch && matchesPriority;
-  });
+      // Compute deadlines
+      const calculateDaysRemaining = (dueDateStr) => {
+        const due = new Date(dueDateStr);
+        due.setHours(0,0,0,0);
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const diffTime = due - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays;
+      };
+
+      const incompleteTasks = backendTasks.filter(t => t.dueDate && t.status !== 'Completed');
+      const deadlinesMapped = incompleteTasks.map(t => {
+        const project = backendProjects.find(p => p.id === t.projectId);
+        return {
+          id: t.id,
+          title: t.title,
+          project: project ? project.name : 'No Project',
+          dueDate: t.dueDate,
+          priority: t.priority,
+          daysRemaining: calculateDaysRemaining(t.dueDate)
+        };
+      });
+      setMyDeadlines(deadlinesMapped);
+
+      // Compute project participation
+      const projectsMapped = backendProjects.map(proj => {
+        const projectTasks = backendTasks.filter(t => t.projectId === proj.id);
+        const todo = projectTasks.filter(t => t.status === 'To Do').length;
+        const progressCount = projectTasks.filter(t => t.status === 'In Progress').length;
+        const done = projectTasks.filter(t => t.status === 'Completed').length;
+        const total = todo + progressCount + done;
+        const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+
+        return {
+          id: proj.id,
+          name: proj.name,
+          role: 'Collaborator',
+          progress,
+          todo,
+          progressCount,
+          done
+        };
+      });
+
+      setProjects(projectsMapped.filter(p => p.todo > 0 || p.progressCount > 0 || p.done > 0));
+    } catch (err) {
+      console.error('Failed to fetch collaborator dashboard data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleWsMessage = useCallback((msg) => {
+    if (['task_assigned', 'status_changed', 'comment_added'].includes(msg.type)) {
+      fetchData();
+    }
+  }, [fetchData]);
+
+  useWebSocket(handleWsMessage);
 
   const handleQuickAction = (actionName) => {
     showToast.info(`Action: "${actionName}". Simulating collaborator dashboard workflow.`);
