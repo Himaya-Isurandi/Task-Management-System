@@ -9,10 +9,20 @@ beforeAll(async () => {
   await connectDB();
 
   // Disable FK checks so we can truncate in any order
-  await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+  if (sequelize.getDialect() === 'mysql') {
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+  } else if (sequelize.getDialect() === 'sqlite') {
+    await sequelize.query('PRAGMA foreign_keys = OFF');
+  }
+  
   await Task.destroy({ where: {}, truncate: true });
   await User.destroy({ where: {}, truncate: true });
-  await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+  
+  if (sequelize.getDialect() === 'mysql') {
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+  } else if (sequelize.getDialect() === 'sqlite') {
+    await sequelize.query('PRAGMA foreign_keys = ON');
+  }
 
   await User.create({ name: 'Admin', email: 'admin@test.com', password: 'Admin@1234', role: 'Admin', mustResetPassword: false });
   await User.create({ name: 'PM', email: 'pm@test.com', password: 'Pm@12345', role: 'Project Manager', mustResetPassword: false });

@@ -5,11 +5,21 @@ const { User, Otp } = require('../src/models');
 
 beforeAll(async () => {
   await connectDB();
-  // Disable FK checks, truncate, re-enable — works on MySQL
-  await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+  // Disable FK checks, truncate, re-enable
+  if (sequelize.getDialect() === 'mysql') {
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+  } else if (sequelize.getDialect() === 'sqlite') {
+    await sequelize.query('PRAGMA foreign_keys = OFF');
+  }
+  
   await User.destroy({ where: {}, truncate: true });
   await Otp.destroy({ where: {}, truncate: true });
-  await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+  
+  if (sequelize.getDialect() === 'mysql') {
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+  } else if (sequelize.getDialect() === 'sqlite') {
+    await sequelize.query('PRAGMA foreign_keys = ON');
+  }
 
   await User.create({
     name: 'Test Admin',
@@ -131,6 +141,31 @@ describe('Auth Endpoints', () => {
     expect(res6.body.errorCode).toBe('INVALID_OTP');
   });
 
+  test('GET /api/auth/me - requires authentication', async () => {
+    const res = await request(app).get('/api/auth/me');
+    expect(res.statusCode).toBe(401);
+    expect(res.body.errorCode).toBe('NO_TOKEN');
+  });
+
+  test('GET /api/auth/me - returns user with valid token', async () => {
+    mathRandomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.111111);
+
+    await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'testadmin@tms.com', password: 'Admin@1234' });
+
+    const verify = await request(app)
+      .post('/api/auth/2fa/verify')
+      .send({ email: 'testadmin@tms.com', code: '199999' });
+
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${verify.body.accessToken}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.user.email).toBe('testadmin@tms.com');
+  });
+
   test('POST /api/auth/login - rate limits to max 3 code requests per 15 minutes', async () => {
     // 1st request
     const res1 = await request(app)
@@ -156,30 +191,5 @@ describe('Auth Endpoints', () => {
       .send({ email: 'testadmin@tms.com', password: 'Admin@1234' });
     expect(res4.statusCode).toBe(429);
     expect(res4.body.errorCode).toBe('RATE_LIMIT');
-  });
-
-  test('GET /api/auth/me - requires authentication', async () => {
-    const res = await request(app).get('/api/auth/me');
-    expect(res.statusCode).toBe(401);
-    expect(res.body.errorCode).toBe('NO_TOKEN');
-  });
-
-  test('GET /api/auth/me - returns user with valid token', async () => {
-    mathRandomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.111111);
-
-    await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'testadmin@tms.com', password: 'Admin@1234' });
-
-    const verify = await request(app)
-      .post('/api/auth/2fa/verify')
-      .send({ email: 'testadmin@tms.com', code: '199999' });
-
-    const res = await request(app)
-      .get('/api/auth/me')
-      .set('Authorization', `Bearer ${verify.body.accessToken}`);
-
-    expect(res.statusCode).toBe(200);
-    expect(res.body.user.email).toBe('testadmin@tms.com');
   });
 });
