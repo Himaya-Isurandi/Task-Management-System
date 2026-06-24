@@ -6,9 +6,11 @@ import ProgressBar from '../../components/ui/ProgressBar';
 import Avatar from '../../components/ui/Avatar';
 import Button from '../../components/ui/Button';
 import SearchBar from '../../components/ui/SearchBar';
+import Modal from '../../components/ui/Modal';
 import showToast from '../../components/ui/Toast';
 import api from '../../services/api';
 import useWebSocket from '../../hooks/useWebSocket';
+import { useQuickAction } from '../../hooks/useQuickAction';
 import { 
   Users, 
   ShieldAlert, 
@@ -32,6 +34,35 @@ export default function ManagerDashboard() {
   const [deadlines, setDeadlines] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Quick actions modal state
+  const { activeModal, openModal, closeModal } = useQuickAction();
+
+  // Tasks state for Assign Task select dropdown
+  const [tasksList, setTasksList] = useState([]);
+
+  // Create Task form state
+  const [tTitle, setTTitle] = useState('');
+  const [tDesc, setTDesc] = useState('');
+  const [tProjId, setTProjId] = useState('');
+  const [tAssigneeId, setTAssigneeId] = useState('');
+  const [tPriority, setTPriority] = useState('Medium');
+  const [tStatus, setTStatus] = useState('To Do');
+  const [tDueDate, setTDueDate] = useState('');
+
+  // Assign Task form state
+  const [assignTaskId, setAssignTaskId] = useState('');
+  const [assignUserId, setAssignUserId] = useState('');
+
+  // Create Project form state
+  const [pName, setPName] = useState('');
+  const [pPriority, setPPriority] = useState('Medium');
+  const [pStatus, setPStatus] = useState('To Do');
+  const [pDueDate, setPDueDate] = useState('');
+
+  // Progress Report state
+  const [reportData, setReportData] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -117,8 +148,143 @@ export default function ManagerDashboard() {
     return matchesSearch && matchesPriority;
   });
 
-  const handleQuickAction = (actionName) => {
-    showToast.info(`Quick Action Triggered: "${actionName}". Form wizard is simulated.`);
+  const handleOpenModal = async (name) => {
+    openModal(name);
+    if (name === 'assignTask') {
+      try {
+        const { data } = await api.get('/api/tasks?limit=1000');
+        setTasksList(data.tasks || []);
+      } catch (err) {
+        showToast.error('Failed to load tasks list');
+      }
+    } else if (name === 'progressReport') {
+      setReportLoading(true);
+      try {
+        const [projRes, taskRes] = await Promise.all([
+          api.get('/api/projects'),
+          api.get('/api/tasks?limit=1000')
+        ]);
+        const prjs = projRes.data.projects || [];
+        const tsks = taskRes.data.tasks || [];
+        
+        const totalProjects = prjs.length;
+        const activeProjects = prjs.filter(p => p.status === 'In Progress').length;
+        const completedProjects = prjs.filter(p => p.status === 'Completed').length;
+        
+        const totalTasks = tsks.length;
+        const todoTasks = tsks.filter(t => t.status === 'To Do').length;
+        const progressTasks = tsks.filter(t => t.status === 'In Progress').length;
+        const completedTasks = tsks.filter(t => t.status === 'Completed').length;
+        
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const overdueTasks = tsks.filter(t => t.dueDate && new Date(t.dueDate) < today && t.status !== 'Completed').length;
+        
+        const projectBreakdown = prjs.map(p => {
+          const projectTasks = tsks.filter(t => t.projectId === p.id);
+          const total = projectTasks.length;
+          const completed = projectTasks.filter(t => t.status === 'Completed').length;
+          const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+          return {
+            id: p.id,
+            name: p.name,
+            total,
+            progress
+          };
+        });
+        
+        setReportData({
+          totalProjects, activeProjects, completedProjects,
+          totalTasks, todoTasks, progressTasks, completedTasks,
+          overdueTasks, projectBreakdown
+        });
+      } catch (err) {
+        showToast.error('Failed to load report data');
+      } finally {
+        setReportLoading(false);
+      }
+    }
+  };
+
+  const handleCreateTask = async (e) => {
+    e.preventDefault();
+    if (!tTitle || !tProjId || !tDueDate) {
+      showToast.error('Task Title, Project, and Due Date are required');
+      return;
+    }
+    try {
+      const payload = {
+        title: tTitle,
+        description: tDesc,
+        projectId: parseInt(tProjId),
+        priority: tPriority,
+        status: tStatus,
+        dueDate: tDueDate
+      };
+      if (tAssigneeId) {
+        payload.assignedTo = parseInt(tAssigneeId);
+      }
+      await api.post('/api/tasks', payload);
+      showToast.success('Task created successfully');
+      setTTitle('');
+      setTDesc('');
+      setTProjId('');
+      setTAssigneeId('');
+      setTPriority('Medium');
+      setTStatus('To Do');
+      setTDueDate('');
+      closeModal();
+      fetchData();
+    } catch (err) {
+      showToast.error(err.response?.data?.message || 'Failed to create task');
+    }
+  };
+
+  const handleAssignTask = async (e) => {
+    e.preventDefault();
+    if (!assignTaskId || !assignUserId) {
+      showToast.error('Please select both a Task and a User');
+      return;
+    }
+    try {
+      const userObj = users.find(u => u.id === parseInt(assignUserId));
+      await api.put(`/api/tasks/${assignTaskId}`, {
+        assignedTo: parseInt(assignUserId)
+      });
+      showToast.success(`Task assigned to ${userObj ? userObj.name : 'user'}`);
+      setAssignTaskId('');
+      setAssignUserId('');
+      closeModal();
+      fetchData();
+    } catch (err) {
+      showToast.error(err.response?.data?.message || 'Failed to assign task');
+    }
+  };
+
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    if (!pName || !pDueDate) {
+      showToast.error('Project Name and Due Date are required');
+      return;
+    }
+    try {
+      await api.post('/api/projects', {
+        name: pName,
+        status: pStatus,
+        priority: pPriority,
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: pDueDate
+      });
+      showToast.success('Project created');
+      setPName('');
+      setPPriority('Medium');
+      setPStatus('To Do');
+      setPDueDate('');
+      closeModal();
+      fetchData();
+    } catch (err) {
+      showToast.error(err.response?.data?.message || 'Failed to create project');
+    }
   };
 
   return (
@@ -213,7 +379,12 @@ export default function ManagerDashboard() {
                 key={index} 
                 className="glass-card-interactive" 
                 hoverable 
-                onClick={() => handleQuickAction(act.label)}
+                onClick={() => {
+                  if (act.label === 'Create Project') openModal('createProject');
+                  if (act.label === 'Create Task') openModal('createTask');
+                  if (act.label === 'Assign Task') handleOpenModal('assignTask');
+                  if (act.label === 'Generate Report') handleOpenModal('progressReport');
+                }}
                 style={{ 
                   display: 'flex', 
                   flexDirection: 'column', 
@@ -344,6 +515,205 @@ export default function ManagerDashboard() {
           </div>
         </Card>
       </div>
+
+      {/* MODAL 1: CREATE TASK */}
+      <Modal isOpen={activeModal === 'createTask'} onClose={closeModal} title="Create New Task">
+        <form onSubmit={handleCreateTask} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="input-group">
+            <span className="input-label">Task Title *</span>
+            <input className="input-field" value={tTitle} onChange={e => setTTitle(e.target.value)} required placeholder="e.g. Design Login UI" />
+          </div>
+          <div className="input-group">
+            <span className="input-label">Description</span>
+            <textarea className="input-field" rows={3} value={tDesc} onChange={e => setTDesc(e.target.value)} placeholder="Provide task requirements..." />
+          </div>
+          <div className="input-group">
+            <span className="input-label">Associated Project *</span>
+            <select className="input-field" value={tProjId} onChange={e => setTProjId(e.target.value)} required>
+              <option value="">Select Project</option>
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="input-group">
+            <span className="input-label">Assign To (Optional)</span>
+            <select className="input-field" value={tAssigneeId} onChange={e => setTAssigneeId(e.target.value)}>
+              <option value="">Unassigned</option>
+              {users.map(u => (
+                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+              ))}
+            </select>
+          </div>
+          <div className="input-group">
+            <span className="input-label">Priority *</span>
+            <select className="input-field" value={tPriority} onChange={e => setTPriority(e.target.value)}>
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+          <div className="input-group">
+            <span className="input-label">Status *</span>
+            <select className="input-field" value={tStatus} onChange={e => setTStatus(e.target.value)}>
+              <option value="To Do">To Do</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+          <div className="input-group">
+            <span className="input-label">Due Date *</span>
+            <input className="input-field" type="date" min={new Date().toISOString().split('T')[0]} value={tDueDate} onChange={e => setTDueDate(e.target.value)} required />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+            <Button type="button" variant="secondary" onClick={closeModal}>Cancel</Button>
+            <Button type="submit" variant="primary">Create Task</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL 2: ASSIGN TASK */}
+      <Modal isOpen={activeModal === 'assignTask'} onClose={closeModal} title="Assign Specialist to Task">
+        <form onSubmit={handleAssignTask} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="input-group">
+            <span className="input-label">Select Task *</span>
+            <select className="input-field" value={assignTaskId} onChange={e => setAssignTaskId(e.target.value)} required>
+              <option value="">Select Task</option>
+              {tasksList.filter(t => t.status !== 'Completed').map(t => (
+                <option key={t.id} value={t.id}>{t.title} ({t.status})</option>
+              ))}
+            </select>
+          </div>
+          <div className="input-group">
+            <span className="input-label">Assign To *</span>
+            <select className="input-field" value={assignUserId} onChange={e => setAssignUserId(e.target.value)} required>
+              <option value="">Select Team Member</option>
+              {users.map(u => (
+                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+            <Button type="button" variant="secondary" onClick={closeModal}>Cancel</Button>
+            <Button type="submit" variant="primary">Assign Task</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL 3: NEW PROJECT */}
+      <Modal isOpen={activeModal === 'createProject'} onClose={closeModal} title="Create New Project">
+        <form onSubmit={handleCreateProject} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="input-group">
+            <span className="input-label">Project Name *</span>
+            <input className="input-field" value={pName} onChange={e => setPName(e.target.value)} required placeholder="e.g. Apollo Website Redesign" />
+          </div>
+          <div className="input-group">
+            <span className="input-label">Priority *</span>
+            <select className="input-field" value={pPriority} onChange={e => setPPriority(e.target.value)}>
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+          <div className="input-group">
+            <span className="input-label">Status *</span>
+            <select className="input-field" value={pStatus} onChange={e => setPStatus(e.target.value)}>
+              <option value="To Do">To Do</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+          <div className="input-group">
+            <span className="input-label">Due Date *</span>
+            <input className="input-field" type="date" min={new Date().toISOString().split('T')[0]} value={pDueDate} onChange={e => setPDueDate(e.target.value)} required />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+            <Button type="button" variant="secondary" onClick={closeModal}>Cancel</Button>
+            <Button type="submit" variant="primary">Create Project</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL 4: PROGRESS REPORT */}
+      <Modal isOpen={activeModal === 'progressReport'} onClose={closeModal} title="Manager Progress Report">
+        {reportLoading ? (
+          <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading report intelligence...</div>
+        ) : reportData ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxHeight: '70vh', overflowY: 'auto', paddingRight: '4px' }}>
+            
+            {/* PROJECTS STATS */}
+            <div>
+              <h5 style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px', fontSize: '0.875rem' }}>Projects Performance</h5>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{reportData.totalProjects}</div>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Total Initiatives</div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--secondary-accent)' }}>{reportData.activeProjects}</div>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Active Stage</div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--success)' }}>{reportData.completedProjects}</div>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Completed</div>
+                </div>
+              </div>
+            </div>
+
+            {/* TASKS METRICS */}
+            <div>
+              <h5 style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px', fontSize: '0.875rem' }}>Tasks Distribution</h5>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px', borderRadius: '6px', textAlign: 'center' }}>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>{reportData.totalTasks}</div>
+                  <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Total Tasks</div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px', borderRadius: '6px', textAlign: 'center' }}>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-secondary)' }}>{reportData.todoTasks}</div>
+                  <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>To Do</div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px', borderRadius: '6px', textAlign: 'center' }}>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--secondary-accent)' }}>{reportData.progressTasks}</div>
+                  <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>In Progress</div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px', borderRadius: '6px', textAlign: 'center' }}>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--success)' }}>{reportData.completedTasks}</div>
+                  <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Completed</div>
+                </div>
+              </div>
+            </div>
+
+            {/* OVERDUE METRICS */}
+            <div style={{ background: 'rgba(255,77,77,0.06)', border: '1px solid rgba(255,77,77,0.15)', padding: '12px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--danger)' }}>Overdue Deliverables Checklist</span>
+                <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', margin: 0 }}>Tasks requiring immediate management escalations</p>
+              </div>
+              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--danger)' }}>{reportData.overdueTasks}</span>
+            </div>
+
+            {/* PROJECT BREAKDOWN LIST */}
+            <div>
+              <h5 style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '10px', fontSize: '0.875rem' }}>Project Initiatives Progress</h5>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {reportData.projectBreakdown.map(p => (
+                  <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{p.progress}% ({p.total} tasks)</span>
+                    </div>
+                    <ProgressBar value={p.progress} height="5px" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <Button variant="secondary" onClick={closeModal} style={{ alignSelf: 'flex-end', marginTop: '10px' }}>Close Report</Button>
+          </div>
+        ) : (
+          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>No report data.</div>
+        )}
+      </Modal>
 
     </div>
   );

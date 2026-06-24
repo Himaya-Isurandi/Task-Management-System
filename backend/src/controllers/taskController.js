@@ -1,4 +1,4 @@
-const { Task, User, Comment, Notification } = require('../models');
+const { Task, User, Comment, Notification, Project, Attachment } = require('../models');
 const { notifyUser } = require('../utils/websocket');
 const { Op } = require('sequelize');
 
@@ -100,34 +100,67 @@ const updateTask = async (req, res) => {
     const task = await Task.findByPk(req.params.id);
     if (!task) return res.status(404).json({ errorCode: 'NOT_FOUND', message: 'Task not found' });
 
-    const isCollaborator = req.user.role === 'Collaborator';
+    const userRole = req.user.role;
     const oldStatus = task.status;
 
-    if (isCollaborator) {
-      // Collaborators can only update status on their assigned tasks
+    if (userRole === 'Collaborator') {
       if (task.assignedTo !== req.user.id) {
         return res.status(403).json({ errorCode: 'FORBIDDEN', message: 'Access denied' });
       }
-      if (req.body.status) task.status = req.body.status;
-    } else {
-      // Project managers can update everything
-      const { title, description, assignedTo, dueDate, priority, status } = req.body;
-      if (title !== undefined) task.title = title;
-      if (description !== undefined) task.description = description;
-      if (assignedTo !== undefined) task.assignedTo = assignedTo;
-      if (dueDate !== undefined) task.dueDate = dueDate;
-      if (priority !== undefined) task.priority = priority;
-      if (status !== undefined) task.status = status;
+      const { status, ...otherFields } = req.body;
+      if (Object.keys(otherFields).length > 0 || !status) {
+        return res.status(400).json({ errorCode: 'FORBIDDEN_FIELDS', message: 'Collaborators can only update task status' });
+      }
+      const allowedStatuses = ['To Do', 'In Progress', 'Completed'];
+      if (!allowedStatuses.includes(status)) {
+        return res.status(400).json({ errorCode: 'INVALID_STATUS', message: 'Invalid status value' });
+      }
+      task.status = status;
+      await task.save();
+      
+      const updatedTask = await Task.findByPk(task.id, { include: taskIncludes });
+      
+      // Notify project manager of status change
+      const project = await Project.findByPk(task.projectId);
+      if (project && project.managerId) {
+        const notification = await Notification.create({
+          userId: project.managerId,
+          message: `Task "${task.title}" status changed to ${status} by ${req.user.name}`,
+          type: 'status_changed',
+          taskId: task.id,
+        });
+        notifyUser(project.managerId, { type: 'status_changed', notification, task: updatedTask });
+      }
+      
+      return res.json({ message: 'Task updated successfully', task: updatedTask });
     }
 
+    // Admin / Project Manager: full update allowed
+    const { title, description, priority, status, dueDate, assignedTo, projectId } = req.body;
+    if (title !== undefined) task.title = title;
+    if (description !== undefined) task.description = description;
+    if (priority !== undefined) task.priority = priority;
+    if (status !== undefined) task.status = status;
+    if (dueDate !== undefined) task.dueDate = dueDate;
+    if (assignedTo !== undefined) task.assignedTo = assignedTo;
+    if (projectId !== undefined) task.projectId = projectId;
     await task.save();
+
     const updatedTask = await Task.findByPk(task.id, { include: taskIncludes });
 
-    // Notify assignee of status change
-    if (task.assignedTo && req.body.status && req.body.status !== oldStatus) {
+    // Notify assignee of status change or assignment
+    if (assignedTo !== undefined && assignedTo !== task.assignedTo) {
+      const notification = await Notification.create({
+        userId: assignedTo,
+        message: `You have been assigned a new task: "${task.title}"`,
+        type: 'task_assigned',
+        taskId: task.id,
+      });
+      notifyUser(assignedTo, { type: 'task_assigned', notification, task: updatedTask });
+    } else if (task.assignedTo && status !== undefined && status !== oldStatus) {
       const notification = await Notification.create({
         userId: task.assignedTo,
-        message: `Task "${task.title}" status changed to ${task.status}`,
+        message: `Task "${task.title}" status changed to ${status}`,
         type: 'status_changed',
         taskId: task.id,
       });
@@ -186,4 +219,26 @@ const addComment = async (req, res) => {
   }
 };
 
-module.exports = { getTasks, getTaskById, createTask, updateTask, deleteTask, addComment };
+// POST /api/tasks/:id/attachments
+const addAttachment = async (req, res) => {
+  try {
+    const task = await Task.findByPk(req.params.id);
+    if (!task) return res.status(404).json({ errorCode: 'NOT_FOUND', message: 'Task not found' });
+    if (!req.file) return res.status(400).json({ errorCode: 'NO_FILE', message: 'No file uploaded' });
+
+    const attachment = await Attachment.create({
+      fileName: req.file.originalname,
+      filePath: `/uploads/${req.file.filename}`,
+      fileType: req.file.mimetype,
+      fileSize: req.file.size,
+      taskId: task.id,
+      uploadedBy: req.user.id,
+    });
+
+    res.status(201).json({ message: 'Attachment uploaded', attachment });
+  } catch (error) {
+    res.status(500).json({ errorCode: 'SERVER_ERROR', message: error.message });
+  }
+};
+
+module.exports = { getTasks, getTaskById, createTask, updateTask, deleteTask, addComment, addAttachment };

@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const { body } = require('express-validator');
-const { login, refresh, logout, resetPassword, getMe, verify2fa, updateProfile } = require('../controllers/authController');
-const { authenticate } = require('../middleware/auth');
+const { login, refresh, logout, resetPassword, getMe, verify2fa, updateProfile, changePassword } = require('../controllers/authController');
+const { authenticate, checkPasswordReset } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 
 /**
@@ -57,5 +57,11 @@ router.post('/2fa/verify',
   verify2fa
 );
 router.put('/profile', authenticate, updateProfile);
+router.put('/change-password', authenticate, checkPasswordReset, [
+  body('currentPassword').notEmpty().withMessage('Current password is required'),
+  body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Password must contain lowercase, uppercase, and a number'),
+  validate
+], changePassword);
 
 module.exports = router;

@@ -8,6 +8,8 @@ import Avatar from '../../components/ui/Avatar';
 import showToast from '../../components/ui/Toast';
 import api from '../../services/api';
 import useWebSocket from '../../hooks/useWebSocket';
+import Modal from '../../components/ui/Modal';
+import { useQuickAction } from '../../hooks/useQuickAction';
 import { 
   CheckSquare, 
   MessageSquare, 
@@ -26,6 +28,17 @@ export default function CollabDashboard() {
   const [myDeadlines, setMyDeadlines] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const { activeModal, openModal, closeModal } = useQuickAction();
+  const [selectedTaskId, setSelectedTaskId] = useState('');
+
+  const [newStatus, setNewStatus] = useState('In Progress');
+  const [statusNote, setStatusNote] = useState('');
+
+  const [commentText, setCommentText] = useState('');
+  const [attachmentFile, setAttachmentFile] = useState(null);
+
+  const [tasksList, setTasksList] = useState([]);
+
   const fetchData = useCallback(async () => {
     try {
       const [projectsRes, tasksRes] = await Promise.all([
@@ -35,6 +48,7 @@ export default function CollabDashboard() {
 
       const backendProjects = projectsRes.data.projects || [];
       const backendTasks = tasksRes.data.tasks || [];
+      setTasksList(backendTasks);
 
       // Compute deadlines
       const calculateDaysRemaining = (dueDateStr) => {
@@ -102,8 +116,74 @@ export default function CollabDashboard() {
   useWebSocket(handleWsMessage);
 
   const handleQuickAction = (actionName) => {
-    showToast.info(`Action: "${actionName}". Simulating collaborator dashboard workflow.`);
+    if (actionName === 'Update Status') {
+      openModal('updateStatus');
+    } else if (actionName === 'Add Comment' || actionName === 'Upload Attachment') {
+      openModal('addCommentAttach');
+    } else {
+      showToast.info(`Action: "${actionName}". Simulating collaborator dashboard workflow.`);
+    }
   };
+
+  const handleUpdateStatus = async (e) => {
+    e.preventDefault();
+    if (!selectedTaskId || !statusNote) {
+      showToast.error('Task and Update Note are required');
+      return;
+    }
+    try {
+      await api.patch(`/api/tasks/${selectedTaskId}`, { status: newStatus });
+      await api.post(`/api/tasks/${selectedTaskId}/comments`, { content: statusNote });
+      showToast.success('Task status and note updated successfully');
+      closeModal();
+      setSelectedTaskId('');
+      setStatusNote('');
+      fetchData();
+    } catch (err) {
+      showToast.error(err.response?.data?.message || 'Failed to update status');
+    }
+  };
+
+  const handleAddCommentAttach = async (e) => {
+    e.preventDefault();
+    if (!selectedTaskId) {
+      showToast.error('Please select a task');
+      return;
+    }
+    if (!commentText && !attachmentFile) {
+      showToast.error('Please provide a comment or an attachment');
+      return;
+    }
+    try {
+      if (commentText) {
+        await api.post(`/api/tasks/${selectedTaskId}/comments`, { content: commentText });
+      }
+      if (attachmentFile) {
+        const formData = new FormData();
+        formData.append('file', attachmentFile);
+        await api.post(`/api/tasks/${selectedTaskId}/attachments`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      }
+      showToast.success('Update posted successfully');
+      closeModal();
+      setSelectedTaskId('');
+      setCommentText('');
+      setAttachmentFile(null);
+      fetchData();
+    } catch (err) {
+      showToast.error(err.response?.data?.message || 'Failed to post update');
+    }
+  };
+
+  const filteredDeadlines = myDeadlines.filter(d => {
+    const matchesSearch = deadlineSearch
+      ? d.title.toLowerCase().includes(deadlineSearch.toLowerCase()) ||
+        d.project.toLowerCase().includes(deadlineSearch.toLowerCase())
+      : true;
+    const matchesPriority = deadlinePriority ? d.priority === deadlinePriority : true;
+    return matchesSearch && matchesPriority;
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
@@ -303,6 +383,58 @@ export default function CollabDashboard() {
           })}
         </div>
       </div>
+
+      <Modal isOpen={activeModal === 'updateStatus'} onClose={closeModal} title="Update Task Status">
+        <form onSubmit={handleUpdateStatus} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="input-group">
+            <span className="input-label">Select Task *</span>
+            <select className="input-field" value={selectedTaskId} onChange={e => setSelectedTaskId(e.target.value)} required>
+              <option value="">Select Task...</option>
+              {tasksList.map(t => <option key={t.id} value={t.id}>{t.title} ({t.status})</option>)}
+            </select>
+          </div>
+          <div className="input-group">
+            <span className="input-label">New Status *</span>
+            <select className="input-field" value={newStatus} onChange={e => setNewStatus(e.target.value)} required>
+              <option value="To Do">To Do</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+          <div className="input-group">
+            <span className="input-label">Update Note *</span>
+            <textarea className="input-field" rows={3} value={statusNote} onChange={e => setStatusNote(e.target.value)} placeholder="Provide context for this status change..." required />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+            <Button type="button" variant="secondary" onClick={closeModal}>Cancel</Button>
+            <Button type="submit" variant="primary">Update Status</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'addCommentAttach'} onClose={closeModal} title="Add Comment & Attachment">
+        <form onSubmit={handleAddCommentAttach} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="input-group">
+            <span className="input-label">Select Task *</span>
+            <select className="input-field" value={selectedTaskId} onChange={e => setSelectedTaskId(e.target.value)} required>
+              <option value="">Select Task...</option>
+              {tasksList.map(t => <option key={t.id} value={t.id}>{t.title} ({t.status})</option>)}
+            </select>
+          </div>
+          <div className="input-group">
+            <span className="input-label">Comment (Optional if attaching file)</span>
+            <textarea className="input-field" rows={3} value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Add a comment or note..." />
+          </div>
+          <div className="input-group">
+            <span className="input-label">Attachment (Optional if commenting)</span>
+            <input className="input-field" type="file" onChange={e => setAttachmentFile(e.target.files[0])} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+            <Button type="button" variant="secondary" onClick={closeModal}>Cancel</Button>
+            <Button type="submit" variant="primary">Post Update</Button>
+          </div>
+        </form>
+      </Modal>
 
     </div>
   );

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import showToast from '../../components/ui/Toast';
+import api from '../../services/api';
 import { 
   Globe, 
   Bell, 
@@ -39,6 +40,39 @@ export default function SettingsPage() {
 
   // Appearance state
   const [accentColor, setAccentColor] = useState('#4A90E2');
+
+  // Password state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+
+    // Validation: min 8 chars, uppercase, number
+    if (newPassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters long');
+      return;
+    }
+    if (!/[A-Z]/.test(newPassword)) {
+      setPasswordError('Password must contain at least one uppercase letter');
+      return;
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      setPasswordError('Password must contain at least one number');
+      return;
+    }
+
+    try {
+      await api.post('/api/auth/change-password', { currentPassword, newPassword });
+      showToast.success('Password updated successfully');
+      setCurrentPassword('');
+      setNewPassword('');
+    } catch (err) {
+      showToast.error(err.response?.data?.message || 'Failed to update password');
+    }
+  };
 
   const handleToggleNotif = (key, type) => {
     setNotifs(prev => ({
@@ -227,6 +261,27 @@ export default function SettingsPage() {
               <div>
                 <h4 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>Security Audit</h4>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Administer Two-Factor Authentication and evaluate active devices</p>
+              </div>
+
+              {/* Change Password */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--card-border)' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <Lock size={24} style={{ color: 'var(--secondary-accent)' }} />
+                  <div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', display: 'block' }}>Change Password</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Update your account password</span>
+                  </div>
+                </div>
+                <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '10px' }}>
+                  <div className="input-group">
+                    <input className="input-field" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required placeholder="Current Password" />
+                  </div>
+                  <div className="input-group">
+                    <input className="input-field" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required placeholder="New Password" />
+                    {passwordError && <span style={{ fontSize: '0.7rem', color: 'var(--danger)' }}>{passwordError}</span>}
+                  </div>
+                  <Button type="submit" variant="primary" style={{ alignSelf: 'flex-start' }}>Update Password</Button>
+                </form>
               </div>
 
               {/* 2FA Card toggling */}

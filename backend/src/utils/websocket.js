@@ -2,6 +2,8 @@ const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 
 let wss;
+let keepAliveInterval;
+
 // Map of userId -> WebSocket connection
 const clients = new Map();
 
@@ -44,7 +46,7 @@ const initWebSocket = (server) => {
   });
 
   // Keep-alive interval
-  const keepAliveInterval = setInterval(() => {
+  keepAliveInterval = setInterval(() => {
     wss.clients.forEach((ws) => {
       if (!ws.isAlive) return ws.terminate();
       ws.isAlive = false;
@@ -63,7 +65,7 @@ const notifyUser = (userId, payload) => {
   }
 };
 
-// Broadcast to all connected users (admins)
+// Broadcast to all connected users
 const broadcast = (payload) => {
   clients.forEach((ws) => {
     if (ws.readyState === WebSocket.OPEN) {
@@ -76,11 +78,10 @@ const cleanupWebSocket = () => {
   if (keepAliveInterval) {
     clearInterval(keepAliveInterval);
   }
-
   if (wss) {
     wss.close();
   }
-
   clients.clear();
 };
+
 module.exports = { initWebSocket, notifyUser, broadcast, cleanupWebSocket };

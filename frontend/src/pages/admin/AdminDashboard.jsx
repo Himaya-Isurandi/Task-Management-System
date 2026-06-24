@@ -3,8 +3,12 @@ import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import StatCard from '../../components/ui/StatCard';
 import ProgressBar from '../../components/ui/ProgressBar';
+import Button from '../../components/ui/Button';
+import Modal from '../../components/ui/Modal';
 import api from '../../services/api';
 import useWebSocket from '../../hooks/useWebSocket';
+import { useQuickAction } from '../../hooks/useQuickAction';
+import showToast from '../../components/ui/Toast';
 import { 
   Users, 
   ShieldAlert, 
@@ -12,7 +16,9 @@ import {
   UserCheck, 
   UserX, 
   UserRoundCheck,
-  TrendingUp
+  TrendingUp,
+  UserPlus,
+  FolderPlus
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -21,13 +27,45 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Quick Action Modal states
+  const { activeModal, openModal, closeModal } = useQuickAction();
+
+  // Quick action form states
+  // Create User
+  const [uName, setUName] = useState('');
+  const [uEmail, setUEmail] = useState('');
+  const [uRole, setURole] = useState('Collaborator');
+  const [emailError, setEmailError] = useState('');
+
+  // Send Broadcast
+  const [bcMessage, setBcMessage] = useState('');
+  const [bcRole, setBcRole] = useState('All');
+
+  // New Project
+  const [pName, setPName] = useState('');
+  const [pPriority, setPPriority] = useState('Medium');
+  const [pStatus, setPStatus] = useState('To Do');
+  const [pDueDate, setPDueDate] = useState('');
+
   const fetchData = useCallback(async () => {
     try {
-      const [projectsRes, usersRes] = await Promise.all([
+      const [projectsRes, usersRes, tasksRes] = await Promise.all([
         api.get('/api/projects'),
-        api.get('/api/users')
+        api.get('/api/users'),
+        api.get('/api/tasks?limit=1000')
       ]);
-      setProjects(projectsRes.data.projects || []);
+      const rawProjects = projectsRes.data.projects || [];
+      const tasks = tasksRes.data.tasks || [];
+      
+      const projectsWithProgress = rawProjects.map(p => {
+        const projectTasks = tasks.filter(t => t.projectId === p.id);
+        const total = projectTasks.length;
+        const completed = projectTasks.filter(t => t.status === 'Completed').length;
+        const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+        return { ...p, progress };
+      });
+
+      setProjects(projectsWithProgress);
       setUsers(usersRes.data.users || []);
     } catch (err) {
       console.error('Failed to fetch admin dashboard data:', err);
@@ -255,6 +293,174 @@ export default function AdminDashboard() {
           />
         </div>
       </div>
+
+      {/* QUICK ACTIONS SECTION */}
+      <Card style={{ padding: '24px', marginTop: '20px' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>
+          Quick Actions
+        </h3>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <Button variant="primary" onClick={() => openModal('createUser')}>
+            <UserPlus size={15} style={{ marginRight: '6px' }} /> Create User
+          </Button>
+          <Button variant="secondary" onClick={() => openModal('broadcast')}>
+            <ShieldAlert size={15} style={{ marginRight: '6px' }} /> Send Broadcast
+          </Button>
+          <Button variant="secondary" onClick={() => openModal('createProject')}>
+            <FolderPlus size={15} style={{ marginRight: '6px' }} /> New Project
+          </Button>
+        </div>
+      </Card>
+
+      {/* MODAL 1: CREATE USER */}
+      <Modal isOpen={activeModal === 'createUser'} onClose={closeModal} title="Create New User">
+        <form onSubmit={async (e) => {
+          e.preventDefault();
+          if (!uName || !uEmail) {
+            showToast.error('Please fill in all required fields');
+            return;
+          }
+          try {
+            await api.post('/api/users', { name: uName, email: uEmail, role: uRole });
+            showToast.success('User created. Welcome email sent.');
+            setUName('');
+            setUEmail('');
+            setURole('Collaborator');
+            setEmailError('');
+            closeModal();
+            fetchData();
+          } catch (err) {
+            const errorCode = err.response?.data?.errorCode;
+            if (errorCode === 'EMAIL_EXISTS') {
+              setEmailError('This email is already registered');
+            } else {
+              showToast.error(err.response?.data?.message || 'Failed to create user');
+            }
+          }
+        }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="input-group">
+            <span className="input-label">Full Name *</span>
+            <input className="input-field" value={uName} onChange={e => setUName(e.target.value)} required placeholder="e.g. Jane Doe" />
+          </div>
+          <div className="input-group">
+            <span className="input-label">Email *</span>
+            <input className="input-field" type="email" value={uEmail} onChange={e => { setUEmail(e.target.value); setEmailError(''); }} required placeholder="e.g. jane@tms.com" />
+            {emailError && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>{emailError}</span>}
+          </div>
+          <div className="input-group">
+            <span className="input-label">Role *</span>
+            <select className="input-field" value={uRole} onChange={e => setURole(e.target.value)}>
+              <option value="Collaborator">Collaborator</option>
+              <option value="Project Manager">Project Manager</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+            <Button type="button" variant="secondary" onClick={closeModal}>Cancel</Button>
+            <Button type="submit" variant="primary">Create User</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL 2: SEND BROADCAST */}
+      <Modal isOpen={activeModal === 'broadcast'} onClose={closeModal} title="Send Broadcast Announcement">
+        <form onSubmit={async (e) => {
+          e.preventDefault();
+          if (!bcMessage) {
+            showToast.error('Broadcast message is required');
+            return;
+          }
+          try {
+            const payload = { message: bcMessage };
+            if (bcRole !== 'All') {
+              payload.role = bcRole;
+            }
+            const { data } = await api.post('/api/admin/broadcast', payload);
+            showToast.success(data.message || 'Broadcast sent successfully');
+            setBcMessage('');
+            setBcRole('All');
+            closeModal();
+          } catch (err) {
+            showToast.error(err.response?.data?.message || 'Failed to send broadcast');
+          }
+        }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="input-group">
+            <span className="input-label">Announcement Message *</span>
+            <textarea className="input-field" rows={4} maxLength={500} value={bcMessage} onChange={e => setBcMessage(e.target.value)} required placeholder="Write your broadcast announcement message (max 500 chars)..." />
+          </div>
+          <div className="input-group">
+            <span className="input-label">Target Role *</span>
+            <select className="input-field" value={bcRole} onChange={e => setBcRole(e.target.value)}>
+              <option value="All">All Users</option>
+              <option value="Admin">Admin</option>
+              <option value="Project Manager">Project Manager</option>
+              <option value="Collaborator">Collaborator</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+            <Button type="button" variant="secondary" onClick={closeModal}>Cancel</Button>
+            <Button type="submit" variant="primary">Send Broadcast</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL 3: NEW PROJECT */}
+      <Modal isOpen={activeModal === 'createProject'} onClose={closeModal} title="Create New Project">
+        <form onSubmit={async (e) => {
+          e.preventDefault();
+          if (!pName || !pDueDate) {
+            showToast.error('Project Name and Due Date are required');
+            return;
+          }
+          try {
+            await api.post('/api/projects', {
+              name: pName,
+              status: pStatus,
+              priority: pPriority,
+              startDate: new Date().toISOString().split('T')[0],
+              endDate: pDueDate
+            });
+            showToast.success('Project created');
+            setPName('');
+            setPPriority('Medium');
+            setPStatus('To Do');
+            setPDueDate('');
+            closeModal();
+            fetchData();
+          } catch (err) {
+            showToast.error(err.response?.data?.message || 'Failed to create project');
+          }
+        }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="input-group">
+            <span className="input-label">Project Name *</span>
+            <input className="input-field" value={pName} onChange={e => setPName(e.target.value)} required placeholder="e.g. Apollo Website Redesign" />
+          </div>
+          <div className="input-group">
+            <span className="input-label">Priority *</span>
+            <select className="input-field" value={pPriority} onChange={e => setPPriority(e.target.value)}>
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+          <div className="input-group">
+            <span className="input-label">Status *</span>
+            <select className="input-field" value={pStatus} onChange={e => setPStatus(e.target.value)}>
+              <option value="To Do">To Do</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+          <div className="input-group">
+            <span className="input-label">Due Date *</span>
+            <input className="input-field" type="date" min={new Date().toISOString().split('T')[0]} value={pDueDate} onChange={e => setPDueDate(e.target.value)} required />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+            <Button type="button" variant="secondary" onClick={closeModal}>Cancel</Button>
+            <Button type="submit" variant="primary">Create Project</Button>
+          </div>
+        </form>
+      </Modal>
 
     </div>
   );

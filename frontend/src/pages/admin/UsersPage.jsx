@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { Navigate } from 'react-router-dom';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
@@ -6,149 +8,151 @@ import SearchBar from '../../components/ui/SearchBar';
 import Modal from '../../components/ui/Modal';
 import Avatar from '../../components/ui/Avatar';
 import showToast from '../../components/ui/Toast';
-import { UserPlus, Edit2, ShieldAlert, Eye, Power, PowerOff, UserMinus } from 'lucide-react';
+import api from '../../services/api';
+import { UserPlus, Edit2, Eye, Power, PowerOff } from 'lucide-react';
 
 export default function UsersPage() {
+  const { user: currentUser, refreshUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [deptFilter, setDeptFilter] = useState('');
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Drawer States
+  // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create'); // 'create', 'edit', 'view'
   const [selectedUser, setSelectedUser] = useState(null);
 
-  // User form states
+  // Form state
   const [fullName, setFullName] = useState('');
-  const [usernameInput, setUsernameInput] = useState('');
   const [emailInput, setEmailInput] = useState('');
-  const [phoneInput, setPhoneInput] = useState('');
-  const [deptInput, setDeptInput] = useState('Development');
   const [roleInput, setRoleInput] = useState('Collaborator');
-  const [isActiveToggle, setIsActiveToggle] = useState(true);
+  const [emailError, setEmailError] = useState('');
 
-  // Initial mock users list
-  const [users, setUsers] = useState([
-    { id: 'u1', name: 'System Admin', username: 'admin', email: 'admin@tms.com', phone: '+1 555-0199', role: 'Admin', department: 'Operations', status: 'Active', bio: 'Lead system administrator.' },
-    { id: 'u2', name: 'Sarah Jenkins', username: 'sjenkins', email: 'manager@tms.com', phone: '+1 555-0144', role: 'Project Manager', department: 'Engineering', status: 'Active', bio: 'Agile Project Manager.' },
-    { id: 'u3', name: 'Alex Rivera', username: 'arivera', email: 'collab@tms.com', phone: '+1 555-0122', role: 'Collaborator', department: 'Development', status: 'Active', bio: 'Frontend engineer.' },
-    { id: 'u4', name: 'James Carter', username: 'jcarter', email: 'jcarter@tms.com', phone: '+1 555-0187', role: 'Collaborator', department: 'Development', status: 'Active', bio: 'Backend developer.' },
-    { id: 'u5', name: 'Elena Rostova', username: 'erostova', email: 'erostova@tms.com', phone: '+1 555-0177', role: 'Project Manager', department: 'Marketing', status: 'Active', bio: 'Marketing lead.' },
-    { id: 'u6', name: 'Marcus Aurelius', username: 'philosopher', email: 'marcus@tms.com', phone: '+1 555-0100', role: 'Collaborator', department: 'Design', status: 'Inactive', bio: 'UX Designer.' }
-  ]);
+  const fetchUsers = useCallback(async () => {
+    try {
+      const params = { page: 1, limit: 50 };
+      if (searchQuery) params.search = searchQuery;
+      if (roleFilter) params.role = roleFilter;
+      const { data } = await api.get('/api/users', { params });
+      setUsers(data.users || []);
+    } catch (err) {
+      showToast.error('Failed to load users');
+    } finally {
+      setLoading(false);
+    }
+  }, [searchQuery, roleFilter]);
 
-  // Filters logic
-  const filteredUsers = users.filter(u => {
-    const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          u.username.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = roleFilter ? u.role === roleFilter : true;
-    const matchesStatus = statusFilter ? u.status === statusFilter : true;
-    const matchesDept = deptFilter ? u.department === deptFilter : true;
+  useEffect(() => {
+    if (currentUser?.role === 'Admin') {
+      fetchUsers();
+    }
+  }, [fetchUsers, currentUser]);
 
-    return matchesSearch && matchesRole && matchesStatus && matchesDept;
-  });
+  if (currentUser?.role !== 'Admin') {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const handleOpenCreate = () => {
     setModalMode('create');
     setSelectedUser(null);
-    // Reset Form Fields
     setFullName('');
-    setUsernameInput('');
     setEmailInput('');
-    setPhoneInput('');
-    setDeptInput('Development');
     setRoleInput('Collaborator');
-    setIsActiveToggle(true);
+    setEmailError('');
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (user) => {
     setModalMode('edit');
     setSelectedUser(user);
-    // Populate Form Fields
     setFullName(user.name);
-    setUsernameInput(user.username);
     setEmailInput(user.email);
-    setPhoneInput(user.phone);
-    setDeptInput(user.department);
     setRoleInput(user.role);
-    setIsActiveToggle(user.status === 'Active');
+    setEmailError('');
     setIsModalOpen(true);
   };
 
-  const handleOpenView = (user) => {
-    setModalMode('view');
-    setSelectedUser(user);
-    setIsModalOpen(true);
+  const handleOpenView = async (user) => {
+    try {
+      const { data } = await api.get(`/api/users/${user.id}`);
+      setSelectedUser(data.user);
+      setModalMode('view');
+      setIsModalOpen(true);
+    } catch (err) {
+      showToast.error('Failed to load user details');
+    }
   };
 
-  const handleDeactivate = (userId) => {
-    setUsers(prev => prev.map(u => {
-      if (u.id === userId) {
-        const newStatus = u.status === 'Active' ? 'Inactive' : 'Active';
-        showToast.info(`User "${u.name}" has been ${newStatus.toLowerCase()}d.`);
-        return { ...u, status: newStatus };
+  const handleToggleActive = async (user) => {
+    if (user.isActive) {
+      const confirmDeactivate = window.confirm(`Are you sure you want to deactivate ${user.name}?`);
+      if (!confirmDeactivate) return;
+      try {
+        await api.delete(`/api/users/${user.id}`);
+        showToast.success('User deactivated');
+        fetchUsers();
+      } catch (err) {
+        showToast.error(err.response?.data?.message || 'Deactivation failed');
       }
-      return u;
-    }));
+    } else {
+      try {
+        await api.put(`/api/users/${user.id}`, { name: user.name, role: user.role, isActive: true });
+        showToast.success(`User "${user.name}" activated`);
+        fetchUsers();
+      } catch (err) {
+        showToast.error(err.response?.data?.message || 'Activation failed');
+      }
+    }
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-
-    if (!fullName || !usernameInput || !emailInput) {
-      showToast.error("Please fill in Name, Username, and Email fields.");
+    if (!fullName || !emailInput) {
+      showToast.error('Please fill in Name and Email fields.');
       return;
     }
 
-    if (modalMode === 'create') {
-      const newUser = {
-        id: 'u-' + Date.now(),
-        name: fullName,
-        username: usernameInput.toLowerCase().trim(),
-        email: emailInput.toLowerCase().trim(),
-        phone: phoneInput || 'N/A',
-        role: roleInput,
-        department: deptInput,
-        status: isActiveToggle ? 'Active' : 'Inactive',
-        bio: 'New user added by administrator.'
-      };
-      setUsers([newUser, ...users]);
-      showToast.success(`User "${fullName}" created successfully!`);
-    } else if (modalMode === 'edit') {
-      setUsers(prev => prev.map(u => {
-        if (u.id === selectedUser.id) {
-          return {
-            ...u,
-            name: fullName,
-            username: usernameInput.toLowerCase().trim(),
-            email: emailInput.toLowerCase().trim(),
-            phone: phoneInput || 'N/A',
-            role: roleInput,
-            department: deptInput,
-            status: isActiveToggle ? 'Active' : 'Inactive'
-          };
+    try {
+      if (modalMode === 'create') {
+        await api.post('/api/users', { name: fullName, email: emailInput, role: roleInput });
+        showToast.success(`User "${fullName}" created! Welcome email sent.`);
+      } else if (modalMode === 'edit') {
+        await api.put(`/api/users/${selectedUser.id}`, { name: fullName, role: roleInput });
+        showToast.success(`User "${fullName}" updated successfully!`);
+        if (selectedUser.id === currentUser?.id) {
+          await refreshUser();
         }
-        return u;
-      }));
-      showToast.success(`User "${fullName}" details updated successfully!`);
+      }
+      setIsModalOpen(false);
+      fetchUsers();
+    } catch (err) {
+      const errorCode = err.response?.data?.errorCode;
+      if (errorCode === 'EMAIL_EXISTS') {
+        setEmailError('This email is already registered');
+      } else {
+        showToast.error(err.response?.data?.message || 'Operation failed');
+      }
     }
-
-    setIsModalOpen(false);
   };
+
+  const filteredUsers = users.filter(u => {
+    const matchesStatus = statusFilter === 'Active' ? u.isActive :
+                         statusFilter === 'Inactive' ? !u.isActive : true;
+    return matchesStatus;
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
       
-      {/* HEADER ROW */}
+      {/* HEADER */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
         <div>
           <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>User Directory</h3>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Manage role configurations and accounts</p>
         </div>
-        <Button onClick={handleOpenCreate} variant="primary" style={{ height: '42px' }}>
+        <Button onClick={handleOpenCreate} variant="primary">
           <UserPlus size={16} /> Create User
         </Button>
       </div>
@@ -156,20 +160,16 @@ export default function UsersPage() {
       {/* FILTER BAR */}
       <Card style={{ padding: '16px' }}>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          
-          {/* Search bar input */}
           <div style={{ flex: 1, minWidth: '240px' }}>
             <SearchBar 
-              placeholder="Search by name, username or email..." 
+              placeholder="Search by name or email..." 
               value={searchQuery}
               onChange={(val) => setSearchQuery(val)}
             />
           </div>
-
-          {/* Role Dropdown */}
           <select 
             className="input-field" 
-            style={{ width: '150px', padding: '10px 12px' }}
+            style={{ width: '160px', padding: '10px 12px' }}
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
           >
@@ -178,11 +178,9 @@ export default function UsersPage() {
             <option value="Project Manager">Project Manager</option>
             <option value="Collaborator">Collaborator</option>
           </select>
-
-          {/* Status Dropdown */}
           <select 
             className="input-field" 
-            style={{ width: '150px', padding: '10px 12px' }}
+            style={{ width: '160px', padding: '10px 12px' }}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -190,304 +188,142 @@ export default function UsersPage() {
             <option value="Active">Active</option>
             <option value="Inactive">Inactive</option>
           </select>
-
-          {/* Department Dropdown */}
-          <select 
-            className="input-field" 
-            style={{ width: '160px', padding: '10px 12px' }}
-            value={deptFilter}
-            onChange={(e) => setDeptFilter(e.target.value)}
-          >
-            <option value="">All Departments</option>
-            <option value="Operations">Operations</option>
-            <option value="Engineering">Engineering</option>
-            <option value="Development">Development</option>
-            <option value="Design">Design</option>
-            <option value="Marketing">Marketing</option>
-          </select>
-
-          {/* Reset Search Filters button */}
-          {(searchQuery || roleFilter || statusFilter || deptFilter) && (
-            <Button 
-              variant="text" 
-              onClick={() => { setSearchQuery(''); setRoleFilter(''); setStatusFilter(''); setDeptFilter(''); }}
-              style={{ fontSize: '0.8rem', padding: '8px 12px' }}
-            >
+          {(searchQuery || roleFilter || statusFilter) && (
+            <Button variant="text" onClick={() => { setSearchQuery(''); setRoleFilter(''); setStatusFilter(''); }}>
               Reset
             </Button>
           )}
-
         </div>
       </Card>
 
-      {/* USERS TABLE */}
+      {/* USER TABLE */}
       <Card style={{ padding: 0, overflow: 'hidden' }}>
-        <div className="table-container">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>User Details</th>
-                <th>Username</th>
-                <th>Email Address</th>
-                <th>Role Badge</th>
-                <th>Department</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.length === 0 ? (
+        {loading ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading users...</div>
+        ) : (
+          <div className="table-container">
+            <table className="table">
+              <thead>
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-                    No users match your filter criteria.
-                  </td>
+                  <th>User</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ) : (
-                filteredUsers.map(user => (
-                  <tr key={user.id}>
+              </thead>
+              <tbody>
+                {filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                      No users found.
+                    </td>
+                  </tr>
+                ) : filteredUsers.map(u => (
+                  <tr key={u.id} style={{ opacity: u.isActive ? 1 : 0.6 }}>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <Avatar name={user.name} size="md" glow={user.status === 'Active'} />
-                        <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{user.name}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Avatar name={u.name} size="sm" />
+                        <div>
+                          <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.875rem' }}>{u.name}</div>
+                          {u.department && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{u.department}</div>}
+                        </div>
                       </div>
                     </td>
-                    <td className="mono-font" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                      @{user.username}
-                    </td>
-                    <td>{user.email}</td>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{u.email}</td>
+                    <td><Badge type={u.role}>{u.role}</Badge></td>
+                    <td><Badge type={u.isActive ? 'active' : 'inactive'}>{u.isActive ? 'Active' : 'Inactive'}</Badge></td>
                     <td>
-                      <Badge type={user.role}>
-                        {user.role}
-                      </Badge>
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{user.department}</td>
-                    <td>
-                      <Badge type={user.status === 'Active' ? 'active' : 'inactive'}>
-                        {user.status}
-                      </Badge>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        <Button 
-                          variant="text" 
-                          iconOnly 
-                          title="View Profile"
-                          onClick={() => handleOpenView(user)}
-                        >
-                          <Eye size={15} style={{ color: 'var(--text-secondary)' }} />
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <Button variant="secondary" onClick={() => handleOpenView(u)} style={{ padding: '6px 10px', fontSize: '0.75rem' }}>
+                          <Eye size={14} /> View
+                        </Button>
+                        <Button variant="secondary" onClick={() => handleOpenEdit(u)} style={{ padding: '6px 10px', fontSize: '0.75rem' }}>
+                          <Edit2 size={14} /> Edit
                         </Button>
                         <Button 
-                          variant="text" 
-                          iconOnly 
-                          title="Edit User"
-                          onClick={() => handleOpenEdit(user)}
+                          variant={u.isActive ? 'danger' : 'secondary'} 
+                          onClick={() => handleToggleActive(u)}
+                          style={{ padding: '6px 10px', fontSize: '0.75rem' }}
                         >
-                          <Edit2 size={15} style={{ color: 'var(--primary-accent)' }} />
-                        </Button>
-                        <Button 
-                          variant="text" 
-                          iconOnly 
-                          title={user.status === 'Active' ? 'Deactivate User' : 'Activate User'}
-                          onClick={() => handleDeactivate(user.id)}
-                        >
-                          {user.status === 'Active' ? (
-                            <PowerOff size={15} style={{ color: 'var(--danger)' }} />
-                          ) : (
-                            <Power size={15} style={{ color: 'var(--success)' }} />
-                          )}
+                          {u.isActive ? <PowerOff size={14} /> : <Power size={14} />}
+                          {u.isActive ? 'Deactivate' : 'Activate'}
                         </Button>
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
-      {/* CREATE / EDIT / VIEW SLIDE-IN MODAL DRAWER */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={
-          modalMode === 'create' 
-            ? 'Add New Team Member' 
-            : modalMode === 'edit' 
-              ? `Edit: ${selectedUser?.name}` 
-              : `Profile: ${selectedUser?.name}`
-        }
-        variant="drawer"
-        width="480px"
-      >
-        {modalMode === 'view' ? (
-          // View Profile Drawer Layout
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', alignItems: 'center', textAlign: 'center' }}>
-            <Avatar name={selectedUser?.name} size="xl" glow={selectedUser?.status === 'Active'} />
-            <div>
-              <h4 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                {selectedUser?.name}
-              </h4>
-              <p className="mono-font" style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '8px' }}>
-                @{selectedUser?.username}
-              </p>
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                <Badge type={selectedUser?.role}>{selectedUser?.role}</Badge>
-                <Badge type={selectedUser?.status === 'Active' ? 'active' : 'inactive'}>{selectedUser?.status}</Badge>
-              </div>
-            </div>
-
-            <div style={{
-              width: '100%',
-              height: '1px',
-              background: 'rgba(74, 144, 226, 0.15)',
-              margin: '8px 0'
-            }} />
-
-            <div style={{ width: '100%', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <span className="input-label" style={{ display: 'block', marginBottom: '2px' }}>Email Address</span>
-                <span style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>{selectedUser?.email}</span>
-              </div>
-              <div>
-                <span className="input-label" style={{ display: 'block', marginBottom: '2px' }}>Phone Number</span>
-                <span style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>{selectedUser?.phone}</span>
-              </div>
-              <div>
-                <span className="input-label" style={{ display: 'block', marginBottom: '2px' }}>Department</span>
-                <span style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>{selectedUser?.department}</span>
-              </div>
-              <div>
-                <span className="input-label" style={{ display: 'block', marginBottom: '2px' }}>Short Biography</span>
-                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontStyle: 'italic', lineHeight: '1.4' }}>
-                  "{selectedUser?.bio || 'No bio provided.'}"
-                </p>
-              </div>
-            </div>
-
-            <Button 
-              onClick={() => setIsModalOpen(false)} 
-              variant="secondary" 
-              style={{ width: '100%', marginTop: '16px' }}
-            >
-              Close Profile View
-            </Button>
+      {/* CREATE/EDIT MODAL */}
+      <Modal isOpen={isModalOpen && modalMode !== 'view'} onClose={() => setIsModalOpen(false)} title={modalMode === 'create' ? 'Create New User' : 'Edit User'}>
+        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="input-group">
+            <span className="input-label">Full Name *</span>
+            <input className="input-field" value={fullName} onChange={e => setFullName(e.target.value)} required placeholder="e.g. John Doe" />
           </div>
-        ) : (
-          // Create/Edit Form Drawer Layout
-          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-            <div className="input-group">
-              <span className="input-label">Full Name</span>
-              <input 
-                type="text" 
-                className="input-field" 
-                placeholder="e.g. Marcus Aurelius" 
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="input-group">
-              <span className="input-label">Username</span>
-              <input 
-                type="text" 
-                className="input-field" 
-                placeholder="e.g. philosopher" 
-                value={usernameInput}
-                onChange={(e) => setUsernameInput(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="input-group">
-              <span className="input-label">Email Address</span>
-              <input 
-                type="email" 
-                className="input-field" 
-                placeholder="e.g. marcus@tms.com" 
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="input-group">
-              <span className="input-label">Phone Number</span>
-              <input 
-                type="tel" 
-                className="input-field" 
-                placeholder="e.g. +1 555-0100" 
-                value={phoneInput}
-                onChange={(e) => setPhoneInput(e.target.value)}
-              />
-            </div>
-
-            <div className="input-group">
-              <span className="input-label">Department</span>
-              <select 
-                className="input-field"
-                value={deptInput}
-                onChange={(e) => setDeptInput(e.target.value)}
-              >
-                <option value="Operations">Operations</option>
-                <option value="Engineering">Engineering</option>
-                <option value="Development">Development</option>
-                <option value="Design">Design</option>
-                <option value="Marketing">Marketing</option>
-              </select>
-            </div>
-
-            <div className="input-group">
-              <span className="input-label">System Role</span>
-              <select 
-                className="input-field"
-                value={roleInput}
-                onChange={(e) => setRoleInput(e.target.value)}
-              >
-                <option value="Admin">Admin</option>
-                <option value="Project Manager">Project Manager</option>
-                <option value="Collaborator">Collaborator</option>
-              </select>
-            </div>
-
-            {/* Toggle Status switch */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', borderRadius: '10px', background: 'rgba(74, 144, 226, 0.05)', border: '1px solid var(--card-border)', marginBottom: '8px' }}>
-              <div>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', display: 'block' }}>Account Status</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Toggle status as active/inactive</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsActiveToggle(!isActiveToggle)}
-                style={{
-                  background: isActiveToggle ? 'rgba(16, 217, 160, 0.15)' : 'rgba(255, 107, 107, 0.15)',
-                  border: `1px solid ${isActiveToggle ? 'var(--success)' : 'var(--danger)'}`,
-                  color: isActiveToggle ? 'var(--success)' : 'var(--danger)',
-                  padding: '6px 14px',
-                  borderRadius: '30px',
-                  fontSize: '0.75rem',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {isActiveToggle ? 'ACTIVE' : 'INACTIVE'}
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-              <Button type="submit" variant="primary" style={{ flex: 1 }}>
-                Save User
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)} style={{ flex: 1 }}>
-                Cancel
-              </Button>
-            </div>
-          </form>
-        )}
+          <div className="input-group">
+            <span className="input-label">Email *</span>
+            <input className="input-field" type="email" value={emailInput} onChange={e => { setEmailInput(e.target.value); setEmailError(''); }} required placeholder="e.g. user@tms.com" disabled={modalMode === 'edit'} />
+            {emailError && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>{emailError}</span>}
+          </div>
+          <div className="input-group">
+            <span className="input-label">Role *</span>
+            <select className="input-field" value={roleInput} onChange={e => setRoleInput(e.target.value)}>
+              <option value="Collaborator">Collaborator</option>
+              <option value="Project Manager">Project Manager</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+          {modalMode === 'create' && (
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '8px 12px', background: 'rgba(74, 144, 226, 0.05)', borderRadius: '8px' }}>
+              A temporary password will be emailed to the user automatically.
+            </p>
+          )}
+          {modalMode === 'edit' && (
+            <p style={{ fontSize: '0.75rem', color: 'var(--warning)', padding: '8px 12px', background: 'rgba(255, 179, 71, 0.1)', border: '1px solid var(--warning)', borderRadius: '8px', fontWeight: 'bold' }}>
+              Warning: Permission changes take effect immediately.
+            </p>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+            <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" variant="primary">{modalMode === 'create' ? 'Create User' : 'Save Changes'}</Button>
+          </div>
+        </form>
       </Modal>
 
+      {/* VIEW MODAL */}
+      <Modal isOpen={isModalOpen && modalMode === 'view'} onClose={() => setIsModalOpen(false)} title="User Details">
+        {selectedUser && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
+              <Avatar name={selectedUser.name} size="lg" glow />
+              <div>
+                <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedUser.name}</h4>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{selectedUser.email}</p>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                  <Badge type={selectedUser.role}>{selectedUser.role}</Badge>
+                  <Badge type={selectedUser.isActive ? 'active' : 'inactive'}>{selectedUser.isActive ? 'Active' : 'Inactive'}</Badge>
+                </div>
+              </div>
+            </div>
+            {selectedUser.department && (
+              <div style={{ padding: '12px', background: 'rgba(74, 144, 226, 0.05)', borderRadius: '8px', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Department: </span>
+                <strong style={{ color: 'var(--text-primary)' }}>{selectedUser.department}</strong>
+              </div>
+            )}
+            {selectedUser.bio && (
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>{selectedUser.bio}</p>
+            )}
+            <Button variant="secondary" onClick={() => setIsModalOpen(false)} style={{ alignSelf: 'flex-end' }}>Close</Button>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

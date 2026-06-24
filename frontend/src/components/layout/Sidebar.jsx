@@ -232,7 +232,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
                   {user?.name || 'Anonymous'}
                 </span>
                 <Badge type={user?.role} style={{ padding: '1px 6px', fontSize: '0.65rem', alignSelf: 'flex-start', marginTop: '2px' }}>
-                  {user?.role === 'Project Manager' ? 'Manager' : user?.role || 'User'}
+                  {user?.role === 'Project Manager' ? 'Manager' : user?.role === 'Admin' ? 'Admin' : 'Collaborator'}
                 </Badge>
               </div>
             )}

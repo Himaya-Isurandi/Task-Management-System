@@ -265,6 +265,23 @@ const updateProfile = async (req, res) => {
   }
 };
 
+// PUT /api/auth/change-password
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findByPk(req.user.id);
+    const valid = await bcrypt.compare(currentPassword, user.password);
+    if (!valid) {
+      return res.status(400).json({ errorCode: 'INVALID_PASSWORD', message: 'Current password is incorrect' });
+    }
+    user.password = newPassword;
+    await user.save();
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    res.status(500).json({ errorCode: 'SERVER_ERROR', message: error.message });
+  }
+};
+
 module.exports = { 
   login, 
   refresh, 
@@ -272,5 +289,6 @@ module.exports = {
   resetPassword, 
   getMe, 
   verify2fa, 
-  updateProfile 
+  updateProfile,
+  changePassword
 };

@@ -13,12 +13,14 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem('accessToken');
       if (savedUser && token) {
         try {
-          setUser(JSON.parse(savedUser));
           const { data } = await api.get('/api/auth/me');
           setUser(data.user);
           localStorage.setItem('tasknova_user', JSON.stringify(data.user));
         } catch (e) {
-          console.error('Session validation failed:', e);
+          console.error('Session invalid, clearing:', e);
+          localStorage.removeItem('tasknova_user');
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
         }
       }
       setLoading(false);
@@ -72,14 +74,15 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
-  // Switch role client-side (dev convenience)
-  const switchRole = (role) => {
-    setUser(prev => {
-      if (!prev) return null;
-      const updated = { ...prev, role };
-      localStorage.setItem('tasknova_user', JSON.stringify(updated));
-      return updated;
-    });
+  const refreshUser = async () => {
+    try {
+      const { data } = await api.get('/api/auth/me');
+      setUser(data.user);
+      localStorage.setItem('tasknova_user', JSON.stringify(data.user));
+      return data.user;
+    } catch (e) {
+      console.error('refreshUser failed:', e);
+    }
   };
 
   const updateProfile = async (profileData) => {
@@ -100,7 +103,7 @@ export const AuthProvider = ({ children }) => {
       loginStep1, 
       verifyLogin, 
       logout, 
-      switchRole, 
+      refreshUser,  
       updateProfile,
       resetPassword
     }}>

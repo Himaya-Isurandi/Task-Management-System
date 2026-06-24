@@ -2,28 +2,38 @@ require('dotenv').config();
 const { connectDB } = require('./src/config/database');
 const { User } = require('./src/models');
 
+const testUsers = [
+  { name: 'System Admin',       email: 'admin@tms.com',         password: 'Admin@1234',   role: 'Admin' },
+   { name: 'Test Manager',       email: 'manager@tms.com',       password: 'Manager@1234', role: 'Project Manager' },
+  { name: 'Test Collaborator',  email: 'collaborator@tms.com',  password: 'Collab@1234',  role: 'Collaborator' },
+];
+
 const seed = async () => {
+  console.log('\n🌱 Starting database seed...\n');
   await connectDB();
 
-  // Check if admin already exists
-  const existing = await User.findOne({ where: { email: 'admin@tms.com' } });
-  if (existing) {
-    console.log('ℹ️  Admin user already exists');
-    process.exit(0);
+  for (const u of testUsers) {
+    const existing = await User.findOne({ where: { email: u.email } });
+    if (existing) {
+      console.log(`ℹ️  ${u.role} already exists (${u.email}) — skipping`);
+      continue;
+    }
+
+    await User.create({
+      name: u.name,
+      email: u.email,
+      password: u.password,
+      role: u.role,
+      mustResetPassword: false,   // Seeded users skip forced reset
+    });
+
+    console.log(`✅ Created ${u.role}`);
+    console.log(`   Email:    ${u.email}`);
+    console.log(`   Password: ${u.password}`);
   }
 
-  await User.create({
-    name: 'System Admin',
-    email: 'admin@tms.com',
-    password: 'Admin@1234',
-    role: 'Admin',
-    mustResetPassword: false,
-  });
-
-  console.log('✅ Admin user created!');
-  console.log('   Email:    admin@tms.com');
-  console.log('   Password: Admin@1234');
-  console.log('   ⚠️  Change this password after first login!\n');
+  console.log('\n⚠️  These are DEV-only accounts — remove before production!\n');
+  console.log('📝 Note: 2FA codes are printed in the backend console during development.\n');
   process.exit(0);
 };
 
