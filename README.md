@@ -1,4 +1,5 @@
 # TaskNova - Task Management System
+> **Status**: 🚀 Active Development - Testing Git Collaborators
 
 A full-stack Task Management System with role-based access control, real-time WebSocket notifications, and 2FA authentication.
 
