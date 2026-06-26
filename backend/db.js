@@ -2,30 +2,42 @@ require('dotenv').config();
 
 const { Pool } = require('pg');
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is required. Add it to Railway environment variables.');
+const missingDatabaseUrlError = 'DATABASE_URL is required. Add it to Railway environment variables.';
+
+const pool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false,
+      },
+    })
+  : {
+      query: async () => {
+        throw new Error(missingDatabaseUrlError);
+      },
+      connect: (callback) => {
+        callback(new Error(missingDatabaseUrlError));
+      },
+      on: () => {},
+    };
+
+if (process.env.DATABASE_URL) {
+  pool.connect((error, client, release) => {
+    if (error) {
+      console.error('Database connection failed:', error.message);
+      return;
+    }
+
+    console.log('Connected to Neon PostgreSQL database');
+    release();
+  });
+
+  pool.on('error', (error) => {
+    console.error('Unexpected PostgreSQL pool error:', error.message);
+  });
+} else {
+  console.error(missingDatabaseUrlError);
 }
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
-});
-
-pool.connect((error, client, release) => {
-  if (error) {
-    console.error('Database connection failed:', error.message);
-    return;
-  }
-
-  console.log('Connected to Neon PostgreSQL database');
-  release();
-});
-
-pool.on('error', (error) => {
-  console.error('Unexpected PostgreSQL pool error:', error.message);
-});
 
 pool.pool = pool;
 
