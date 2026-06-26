@@ -21,7 +21,8 @@ const generateTokens = (user) => {
 
 const generateSixDigitOtp = () => crypto.randomInt(0, 1000000).toString().padStart(6, '0');
 
-const validatePasswordPolicy = (password) => /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(password);
+const validatePasswordPolicy = (password) => /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password);
+const passwordPolicyMessage = 'Password must be at least 8 characters with lowercase, uppercase, a number, and a symbol';
 
 // POST /api/auth/login
 const login = async (req, res) => {
@@ -208,12 +209,10 @@ const resetPassword = async (req, res) => {
     const { newPassword } = req.body;
     const user = req.user;
 
-    // Password policy: min 8 chars, 1 uppercase, 1 number
-    const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
-    if (!passwordRegex.test(newPassword)) {
+    if (!validatePasswordPolicy(newPassword)) {
       return res.status(400).json({
         errorCode: 'WEAK_PASSWORD',
-        message: 'Password must be at least 8 characters with one uppercase letter and one number',
+        message: passwordPolicyMessage,
       });
     }
 
@@ -221,7 +220,7 @@ const resetPassword = async (req, res) => {
     user.mustResetPassword = false;
     await user.save();
 
-    res.json({ message: 'Password reset successfully' });
+    res.json({ message: 'Password reset successfully', user: user.toJSON() });
   } catch (error) {
     res.status(500).json({ errorCode: 'SERVER_ERROR', message: error.message });
   }
@@ -286,7 +285,7 @@ const setNewPassword = async (req, res) => {
     if (!validatePasswordPolicy(newPassword)) {
       return res.status(400).json({
         errorCode: 'WEAK_PASSWORD',
-        message: 'Password must be at least 8 characters with lowercase, uppercase, and a number',
+        message: passwordPolicyMessage,
       });
     }
 
@@ -363,6 +362,9 @@ const changePassword = async (req, res) => {
     const valid = await bcrypt.compare(currentPassword, user.password);
     if (!valid) {
       return res.status(400).json({ errorCode: 'INVALID_PASSWORD', message: 'Current password is incorrect' });
+    }
+    if (!validatePasswordPolicy(newPassword)) {
+      return res.status(400).json({ errorCode: 'WEAK_PASSWORD', message: passwordPolicyMessage });
     }
     user.password = newPassword;
     await user.save();

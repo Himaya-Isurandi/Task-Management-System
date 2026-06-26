@@ -1045,3 +1045,19 @@ code, pre, .mono-font {
   transition: width 0.5s ease;
   box-shadow: 0 0 6px rgba(0, 212, 255, 0.4);
 }
+
+.manager-task-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+
+.manager-task-form .form-field-full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 768px) {
+  .manager-task-form {
+    grid-template-columns: 1fr;
+  }
+}

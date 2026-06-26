@@ -105,8 +105,13 @@ export default function LoginPage() {
     setSubmitting2(true);
     try {
       const loggedUser = await verifyLogin(code, tempSession);
+      if (loggedUser.mustResetPassword) {
+        showToast.info('Please set a new password before continuing.');
+        navigate('/reset-password', { replace: true });
+        return;
+      }
       showToast.success(`Hi, ${loggedUser.name}! Welcome back`);
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       showToast.error(err.response?.data?.message || 'Try again. Verification code incorrect or expired.');
     } finally {

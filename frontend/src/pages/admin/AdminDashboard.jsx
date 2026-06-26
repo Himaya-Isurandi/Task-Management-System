@@ -321,8 +321,8 @@ export default function AdminDashboard() {
             return;
           }
           try {
-            await api.post('/api/users', { name: uName, email: uEmail, role: uRole });
-            showToast.success('User created. Welcome email sent.');
+            const { data } = await api.post('/api/users', { name: uName, email: uEmail, role: uRole });
+            showToast.success(data.message || `User created and invitation email sent to ${uEmail}`);
             setUName('');
             setUEmail('');
             setURole('Collaborator');

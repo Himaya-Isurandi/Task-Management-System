@@ -9,7 +9,7 @@ import Modal from '../../components/ui/Modal';
 import Avatar from '../../components/ui/Avatar';
 import showToast from '../../components/ui/Toast';
 import api from '../../services/api';
-import { UserPlus, Edit2, Eye, Power, PowerOff, Trash2 } from 'lucide-react';
+import { UserPlus, Edit2, Eye, Power, PowerOff, Trash2, Mail } from 'lucide-react';
 
 export default function UsersPage() {
   const { user: currentUser, refreshUser } = useAuth();
@@ -109,7 +109,7 @@ export default function UsersPage() {
 
   const handleDeleteUser = async (user) => {
     const confirmDelete = window.confirm(
-      `Are you sure you want to delete ${user.name}? This will permanently remove the user and all their associated data.`
+      'Are you sure you want to delete this user?'
     );
 
     if (!confirmDelete) return;
@@ -123,6 +123,15 @@ export default function UsersPage() {
     }
   };
 
+  const handleResendInvitation = async (user) => {
+    try {
+      const { data } = await api.post(`/api/users/${user.id}/resend-invitation`);
+      showToast.success(data.message || `Invitation email resent to ${user.email}`);
+    } catch (err) {
+      showToast.error(err.response?.data?.message || 'Failed to resend invitation email');
+    }
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     if (!fullName || !emailInput) {
@@ -132,8 +141,8 @@ export default function UsersPage() {
 
     try {
       if (modalMode === 'create') {
-        await api.post('/api/users', { name: fullName, email: emailInput, role: roleInput });
-        showToast.success(`User "${fullName}" created! Welcome email sent.`);
+        const { data } = await api.post('/api/users', { name: fullName, email: emailInput, role: roleInput });
+        showToast.success(data.message || `User created and invitation email sent to ${emailInput}`);
       } else if (modalMode === 'edit') {
         await api.put(`/api/users/${selectedUser.id}`, { name: fullName, role: roleInput });
         showToast.success(`User "${fullName}" updated successfully!`);
@@ -266,14 +275,26 @@ export default function UsersPage() {
                           {u.isActive ? 'Deactivate' : 'Activate'}
                         </Button>
                         {currentUser?.role === 'Admin' && (
-                          <Button
-                            variant="danger"
-                            onClick={() => handleDeleteUser(u)}
-                            title={`Delete ${u.name}`}
-                            style={{ padding: '6px 10px', fontSize: '0.75rem' }}
-                          >
-                            <Trash2 size={14} /> Delete
-                          </Button>
+                          <>
+                            {u.mustResetPassword && (
+                              <Button
+                                variant="secondary"
+                                onClick={() => handleResendInvitation(u)}
+                                title={`Resend invitation to ${u.name}`}
+                                style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+                              >
+                                <Mail size={14} /> Resend
+                              </Button>
+                            )}
+                            <Button
+                              variant="danger"
+                              onClick={() => handleDeleteUser(u)}
+                              title={`Delete ${u.name}`}
+                              style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+                            >
+                              <Trash2 size={14} /> Delete
+                            </Button>
+                          </>
                         )}
                       </div>
                     </td>

@@ -4,9 +4,9 @@ const bcrypt = require('bcryptjs');
 
 const User = sequelize.define('User', {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
-    autoIncrement: true,
   },
   name: {
     type: DataTypes.STRING(100),
@@ -19,8 +19,9 @@ const User = sequelize.define('User', {
     validate: { isEmail: true },
   },
   password: {
-    type: DataTypes.STRING(255),
+    type: DataTypes.TEXT,
     allowNull: false,
+    field: 'password_hash',
   },
   role: {
     type: DataTypes.ENUM('Admin', 'Project Manager', 'Collaborator'),
@@ -30,10 +31,12 @@ const User = sequelize.define('User', {
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
+    field: 'is_active',
   },
   mustResetPassword: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
+    field: 'must_reset_password',
   },
   resetOtpHash: {
     type: DataTypes.STRING(255),
@@ -65,6 +68,8 @@ const User = sequelize.define('User', {
 }, {
   tableName: 'users',
   timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
   hooks: {
     beforeCreate: async (user) => {
       if (user.password) {

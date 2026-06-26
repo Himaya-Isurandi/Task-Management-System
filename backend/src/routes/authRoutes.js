@@ -68,6 +68,7 @@ router.post('/set-new-password',
     body('email').isEmail().withMessage('Valid email required'),
     body('code').isLength({ min: 6, max: 6 }).withMessage('Reset code must be 6 digits'),
     body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+    body('newPassword').matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/).withMessage('Password must contain lowercase, uppercase, a number, and a symbol'),
     validate,
   ],
   setNewPassword
@@ -78,6 +79,7 @@ router.put('/reset-password',
   authenticate,
   [
     body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+    body('newPassword').matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/).withMessage('Password must contain lowercase, uppercase, a number, and a symbol'),
     validate,
   ],
   resetPassword
@@ -92,11 +94,11 @@ router.post('/2fa/verify',
   ],
   verify2fa
 );
-router.put('/profile', authenticate, updateProfile);
+router.put('/profile', authenticate, checkPasswordReset, updateProfile);
 router.put('/change-password', authenticate, checkPasswordReset, [
   body('currentPassword').notEmpty().withMessage('Current password is required'),
   body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Password must contain lowercase, uppercase, and a number'),
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/).withMessage('Password must contain lowercase, uppercase, a number, and a symbol'),
   validate
 ], changePassword);
 

@@ -518,14 +518,10 @@ export default function ManagerDashboard() {
 
       {/* MODAL 1: CREATE TASK */}
       <Modal isOpen={activeModal === 'createTask'} onClose={closeModal} title="Create New Task">
-        <form onSubmit={handleCreateTask} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="input-group">
+        <form onSubmit={handleCreateTask} className="manager-task-form">
+          <div className="input-group form-field-full">
             <span className="input-label">Task Title *</span>
             <input className="input-field" value={tTitle} onChange={e => setTTitle(e.target.value)} required placeholder="e.g. Design Login UI" />
-          </div>
-          <div className="input-group">
-            <span className="input-label">Description</span>
-            <textarea className="input-field" rows={3} value={tDesc} onChange={e => setTDesc(e.target.value)} placeholder="Provide task requirements..." />
           </div>
           <div className="input-group">
             <span className="input-label">Associated Project *</span>
@@ -535,6 +531,10 @@ export default function ManagerDashboard() {
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
+          </div>
+          <div className="input-group">
+            <span className="input-label">Due Date *</span>
+            <input className="input-field" type="date" min={new Date().toISOString().split('T')[0]} value={tDueDate} onChange={e => setTDueDate(e.target.value)} required />
           </div>
           <div className="input-group">
             <span className="input-label">Assign To (Optional)</span>
@@ -561,11 +561,11 @@ export default function ManagerDashboard() {
               <option value="Completed">Completed</option>
             </select>
           </div>
-          <div className="input-group">
-            <span className="input-label">Due Date *</span>
-            <input className="input-field" type="date" min={new Date().toISOString().split('T')[0]} value={tDueDate} onChange={e => setTDueDate(e.target.value)} required />
+          <div className="input-group form-field-full">
+            <span className="input-label">Description</span>
+            <textarea className="input-field" rows={3} value={tDesc} onChange={e => setTDesc(e.target.value)} placeholder="Provide task requirements..." />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+          <div className="form-field-full" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
             <Button type="button" variant="secondary" onClick={closeModal}>Cancel</Button>
             <Button type="submit" variant="primary">Create Task</Button>
           </div>

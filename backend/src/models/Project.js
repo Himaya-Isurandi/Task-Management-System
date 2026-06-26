@@ -3,9 +3,9 @@ const { sequelize } = require('../config/database');
 
 const Project = sequelize.define('Project', {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
-    autoIncrement: true,
   },
   name: {
     type: DataTypes.STRING(255),
@@ -28,7 +28,7 @@ const Project = sequelize.define('Project', {
     allowNull: true,
   },
   managerId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.UUID,
     allowNull: true,
     references: { model: 'users', key: 'id' },
   },

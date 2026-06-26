@@ -3,9 +3,9 @@ const { sequelize } = require('../config/database');
 
 const Attachment = sequelize.define('Attachment', {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
-    autoIncrement: true,
   },
   fileName: {
     type: DataTypes.STRING(255),
@@ -24,12 +24,12 @@ const Attachment = sequelize.define('Attachment', {
     allowNull: true,
   },
   taskId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.UUID,
     allowNull: false,
     references: { model: 'tasks', key: 'id' },
   },
   uploadedBy: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.UUID,
     allowNull: false,
     references: { model: 'users', key: 'id' },
   },

@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }) => {
     const { data } = await api.put('/api/auth/reset-password', { newPassword });
     setUser(prev => {
       if (!prev) return null;
-      const updated = { ...prev, mustResetPassword: false };
+      const updated = { ...prev, ...(data.user || {}), mustResetPassword: false };
       localStorage.setItem('tasknova_user', JSON.stringify(updated));
       return updated;
     });

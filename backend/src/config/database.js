@@ -7,15 +7,42 @@ require('pg-hstore');
 
 const useSQLite = process.env.DB_DIALECT === 'sqlite';
 const isProduction = process.env.NODE_ENV === 'production';
+const enableSqlLogging = process.env.DB_LOGGING === 'true';
+const databaseUrl = process.env.DATABASE_URL || '';
+const databaseUrlProtocol = (() => {
+  try {
+    return databaseUrl ? new URL(databaseUrl).protocol.replace(':', '') : '';
+  } catch (error) {
+    return '';
+  }
+})();
+const isDatabaseUrl =
+  databaseUrlProtocol === 'postgres' ||
+  databaseUrlProtocol === 'postgresql' ||
+  databaseUrlProtocol === 'mysql' ||
+  databaseUrlProtocol === 'mariadb';
+
+const normalizeDatabaseUrl = (url) => {
+  if (!url || (databaseUrlProtocol !== 'postgres' && databaseUrlProtocol !== 'postgresql')) {
+    return url;
+  }
+
+  const parsed = new URL(url);
+  if (parsed.searchParams.get('sslmode') === 'require' && !parsed.searchParams.has('uselibpqcompat')) {
+    parsed.searchParams.set('uselibpqcompat', 'true');
+  }
+
+  return parsed.toString();
+};
 
 let sequelize;
 
-if (process.env.DATABASE_URL) {
-  const isPostgres = process.env.DATABASE_URL.startsWith('postgres://') || process.env.DATABASE_URL.startsWith('postgresql://');
-  sequelize = new Sequelize(process.env.DATABASE_URL, {
+if (databaseUrl && isDatabaseUrl) {
+  const isPostgres = databaseUrlProtocol === 'postgres' || databaseUrlProtocol === 'postgresql';
+  sequelize = new Sequelize(normalizeDatabaseUrl(databaseUrl), {
     dialect: isPostgres ? 'postgres' : 'mysql',
     dialectModule: isPostgres ? pg : undefined,
-    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    logging: enableSqlLogging ? console.log : false,
     dialectOptions: (isProduction || isPostgres) ? {
       ssl: {
         rejectUnauthorized: false
@@ -26,9 +53,13 @@ if (process.env.DATABASE_URL) {
   sequelize = new Sequelize({
     dialect: 'sqlite',
     storage: './database.sqlite',
-    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    logging: enableSqlLogging ? console.log : false,
   });
 } else {
+  if (databaseUrl && !isDatabaseUrl) {
+    console.warn('Ignoring DATABASE_URL because it is not a database connection string. Falling back to DB_* settings.');
+  }
+
   const dialect = process.env.DB_DIALECT || 'mysql';
   sequelize = new Sequelize(
     process.env.DB_NAME,
@@ -39,7 +70,7 @@ if (process.env.DATABASE_URL) {
       port: process.env.DB_PORT || (dialect === 'postgres' ? 5432 : 3306),
       dialect: dialect,
       dialectModule: dialect === 'postgres' ? pg : undefined,
-      logging: process.env.NODE_ENV === 'development' ? console.log : false,
+      logging: enableSqlLogging ? console.log : false,
       pool: {
         max: 10,
         min: 0,

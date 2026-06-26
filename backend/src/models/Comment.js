@@ -3,21 +3,21 @@ const { sequelize } = require('../config/database');
 
 const Comment = sequelize.define('Comment', {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
-    autoIncrement: true,
   },
   content: {
     type: DataTypes.TEXT,
     allowNull: false,
   },
   taskId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.UUID,
     allowNull: false,
     references: { model: 'tasks', key: 'id' },
   },
   userId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.UUID,
     allowNull: false,
     references: { model: 'users', key: 'id' },
   },
