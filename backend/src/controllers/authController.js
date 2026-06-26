@@ -1,8 +1,9 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
+const crypto = require('crypto');
 const { User, Otp } = require('../models');
-const { send2faEmail } = require('../utils/email');
+const { send2faEmail, sendPasswordResetCodeEmail } = require('../utils/email');
 
 const generateTokens = (user) => {
   const accessToken = jwt.sign(
@@ -17,6 +18,10 @@ const generateTokens = (user) => {
   );
   return { accessToken, refreshToken };
 };
+
+const generateSixDigitOtp = () => crypto.randomInt(0, 1000000).toString().padStart(6, '0');
+
+const validatePasswordPolicy = (password) => /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(password);
 
 // POST /api/auth/login
 const login = async (req, res) => {
@@ -222,6 +227,91 @@ const resetPassword = async (req, res) => {
   }
 };
 
+// POST /api/auth/forgot-password
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const genericMessage = 'If this email is registered, you will receive a reset code';
+
+    const user = await User.findOne({ where: { email } });
+    if (!user || !user.isActive) {
+      return res.json({ message: genericMessage });
+    }
+
+    const code = generateSixDigitOtp();
+    user.resetOtpHash = await bcrypt.hash(code, 12);
+    user.resetOtpExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    await user.save();
+
+    if (process.env.NODE_ENV !== 'test') {
+      try {
+        await sendPasswordResetCodeEmail(email, code);
+      } catch (mailError) {
+        console.error(`Failed to send password reset code to ${email}:`, mailError.message);
+      }
+    }
+
+    res.json({ message: genericMessage });
+  } catch (error) {
+    res.status(500).json({ errorCode: 'SERVER_ERROR', message: error.message });
+  }
+};
+
+// POST /api/auth/verify-reset-code
+const verifyResetCode = async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    const user = await User.findOne({ where: { email } });
+
+    if (!user || !user.resetOtpHash || !user.resetOtpExpiresAt || new Date() > user.resetOtpExpiresAt) {
+      return res.status(400).json({ errorCode: 'INVALID_RESET_CODE', message: 'Invalid or expired code. Please try again.' });
+    }
+
+    const valid = await bcrypt.compare(code, user.resetOtpHash);
+    if (!valid) {
+      return res.status(400).json({ errorCode: 'INVALID_RESET_CODE', message: 'Invalid or expired code. Please try again.' });
+    }
+
+    res.json({ message: 'Reset code verified' });
+  } catch (error) {
+    res.status(500).json({ errorCode: 'SERVER_ERROR', message: error.message });
+  }
+};
+
+// POST /api/auth/set-new-password
+const setNewPassword = async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+
+    if (!validatePasswordPolicy(newPassword)) {
+      return res.status(400).json({
+        errorCode: 'WEAK_PASSWORD',
+        message: 'Password must be at least 8 characters with lowercase, uppercase, and a number',
+      });
+    }
+
+    const user = await User.findOne({ where: { email } });
+    if (!user || !user.resetOtpHash || !user.resetOtpExpiresAt || new Date() > user.resetOtpExpiresAt) {
+      return res.status(400).json({ errorCode: 'INVALID_RESET_CODE', message: 'Invalid or expired code. Please try again.' });
+    }
+
+    const valid = await bcrypt.compare(code, user.resetOtpHash);
+    if (!valid) {
+      return res.status(400).json({ errorCode: 'INVALID_RESET_CODE', message: 'Invalid or expired code. Please try again.' });
+    }
+
+    user.password = newPassword;
+    user.mustResetPassword = false;
+    user.resetOtpHash = null;
+    user.resetOtpExpiresAt = null;
+    await user.save();
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    res.status(500).json({ errorCode: 'SERVER_ERROR', message: error.message });
+  }
+};
+
 // GET /api/auth/me
 const getMe = async (req, res) => {
   res.json({ user: req.user });
@@ -290,5 +380,8 @@ module.exports = {
   getMe, 
   verify2fa, 
   updateProfile,
-  changePassword
+  changePassword,
+  forgotPassword,
+  verifyResetCode,
+  setNewPassword
 };

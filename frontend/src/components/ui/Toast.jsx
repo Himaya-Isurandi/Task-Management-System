@@ -1,8 +1,9 @@
 import { toast } from 'react-toastify';
+import { sanitizeNotificationMessage } from '../../utils/notificationText';
 
 export const showToast = {
   success: (msg, options = {}) => {
-    toast.success(msg, {
+    toast.success(sanitizeNotificationMessage(msg), {
       position: "top-right",
       autoClose: 5000,
       hideProgressBar: false,
@@ -14,7 +15,7 @@ export const showToast = {
     });
   },
   error: (msg, options = {}) => {
-    toast.error(msg, {
+    toast.error(sanitizeNotificationMessage(msg), {
       position: "top-right",
       autoClose: 5000,
       hideProgressBar: false,
@@ -26,7 +27,7 @@ export const showToast = {
     });
   },
   info: (msg, options = {}) => {
-    toast.info(msg, {
+    toast.info(sanitizeNotificationMessage(msg), {
       position: "top-right",
       autoClose: 5000,
       hideProgressBar: false,
@@ -38,7 +39,7 @@ export const showToast = {
     });
   },
   warning: (msg, options = {}) => {
-    toast.warn(msg, {
+    toast.warn(sanitizeNotificationMessage(msg), {
       position: "top-right",
       autoClose: 5000,
       hideProgressBar: false,

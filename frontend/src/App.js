@@ -12,6 +12,9 @@ import PageWrapper from './components/layout/PageWrapper';
 
 // Pages
 import LoginPage from './pages/auth/LoginPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetCodePage from './pages/auth/ResetCodePage';
+import SetNewPasswordPage from './pages/auth/SetNewPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 
 // Admin Pages
@@ -102,6 +105,9 @@ export default function App() {
         <Routes>
           {/* Public Auth */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-code" element={<ResetCodePage />} />
+          <Route path="/set-new-password" element={<SetNewPasswordPage />} />
           <Route path="/reset-password" element={
             <ProtectedRoute><ResetPasswordPage /></ProtectedRoute>
           } />

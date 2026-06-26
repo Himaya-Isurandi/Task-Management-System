@@ -3,6 +3,7 @@ import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import showToast from '../../components/ui/Toast';
+import { sanitizeNotificationMessage } from '../../utils/notificationText';
 import { 
   Bell, 
   Folder, 
@@ -172,7 +173,7 @@ export default function NotificationsPage() {
                     margin: 0,
                     lineHeight: '1.4'
                   }}>
-                    {n.message}
+                    {sanitizeNotificationMessage(n.message)}
                   </p>
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                     <span>{n.timestamp}</span>

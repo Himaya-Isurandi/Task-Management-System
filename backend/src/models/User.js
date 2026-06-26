@@ -35,6 +35,16 @@ const User = sequelize.define('User', {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
+  resetOtpHash: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'reset_otp_hash',
+  },
+  resetOtpExpiresAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'reset_otp_expires_at',
+  },
   refreshToken: {
     type: DataTypes.TEXT,
     allowNull: true,
@@ -77,6 +87,8 @@ User.prototype.toJSON = function () {
   const values = { ...this.get() };
   delete values.password;
   delete values.refreshToken;
+  delete values.resetOtpHash;
+  delete values.resetOtpExpiresAt;
   return values;
 };
 

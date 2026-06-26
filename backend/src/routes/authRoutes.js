@@ -1,6 +1,18 @@
 const router = require('express').Router();
 const { body } = require('express-validator');
-const { login, refresh, logout, resetPassword, getMe, verify2fa, updateProfile, changePassword } = require('../controllers/authController');
+const {
+  login,
+  refresh,
+  logout,
+  resetPassword,
+  getMe,
+  verify2fa,
+  updateProfile,
+  changePassword,
+  forgotPassword,
+  verifyResetCode,
+  setNewPassword,
+} = require('../controllers/authController');
 const { authenticate, checkPasswordReset } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 
@@ -36,6 +48,30 @@ router.post('/login',
 );
 
 router.post('/refresh', refresh);
+router.post('/forgot-password',
+  [
+    body('email').isEmail().withMessage('Valid email required'),
+    validate,
+  ],
+  forgotPassword
+);
+router.post('/verify-reset-code',
+  [
+    body('email').isEmail().withMessage('Valid email required'),
+    body('code').isLength({ min: 6, max: 6 }).withMessage('Reset code must be 6 digits'),
+    validate,
+  ],
+  verifyResetCode
+);
+router.post('/set-new-password',
+  [
+    body('email').isEmail().withMessage('Valid email required'),
+    body('code').isLength({ min: 6, max: 6 }).withMessage('Reset code must be 6 digits'),
+    body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+    validate,
+  ],
+  setNewPassword
+);
 router.post('/logout', authenticate, logout);
 router.get('/me', authenticate, getMe);
 router.put('/reset-password',

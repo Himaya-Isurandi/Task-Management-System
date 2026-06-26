@@ -74,6 +74,21 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
+  const requestPasswordReset = async (email) => {
+    const { data } = await api.post('/api/auth/forgot-password', { email });
+    return data;
+  };
+
+  const verifyResetCode = async (email, code) => {
+    const { data } = await api.post('/api/auth/verify-reset-code', { email, code });
+    return data;
+  };
+
+  const setNewPassword = async (email, code, newPassword) => {
+    const { data } = await api.post('/api/auth/set-new-password', { email, code, newPassword });
+    return data;
+  };
+
   const refreshUser = async () => {
     try {
       const { data } = await api.get('/api/auth/me');
@@ -105,7 +120,10 @@ export const AuthProvider = ({ children }) => {
       logout, 
       refreshUser,  
       updateProfile,
-      resetPassword
+      resetPassword,
+      requestPasswordReset,
+      verifyResetCode,
+      setNewPassword
     }}>
       {children}
     </AuthContext.Provider>

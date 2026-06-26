@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import Avatar from '../ui/Avatar';
 import Badge from '../ui/Badge';
 import { Bell, Search, User, Settings, LogOut, CheckCircle } from 'lucide-react';
+import { sanitizeNotificationMessage } from '../../utils/notificationText';
 
 export default function Navbar({ 
   onSearchChange,
@@ -166,7 +167,7 @@ export default function Navbar({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto' }}>
                 {notifications.length === 0 ? (
                   <div style={{ padding: '16px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                    No unread notifications 🚀
+                    No unread notifications
                   </div>
                 ) : (
                   notifications.map(n => (
@@ -180,7 +181,7 @@ export default function Navbar({
                         fontSize: '0.75rem'
                       }}
                     >
-                      <p style={{ margin: 0, color: 'var(--text-primary)', fontWeight: '500' }}>{n.message}</p>
+                      <p style={{ margin: 0, color: 'var(--text-primary)', fontWeight: '500' }}>{sanitizeNotificationMessage(n.message)}</p>
                       <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>{n.time}</span>
                     </div>
                   ))

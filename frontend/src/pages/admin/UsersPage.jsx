@@ -9,7 +9,7 @@ import Modal from '../../components/ui/Modal';
 import Avatar from '../../components/ui/Avatar';
 import showToast from '../../components/ui/Toast';
 import api from '../../services/api';
-import { UserPlus, Edit2, Eye, Power, PowerOff } from 'lucide-react';
+import { UserPlus, Edit2, Eye, Power, PowerOff, Trash2 } from 'lucide-react';
 
 export default function UsersPage() {
   const { user: currentUser, refreshUser } = useAuth();
@@ -90,7 +90,7 @@ export default function UsersPage() {
       const confirmDeactivate = window.confirm(`Are you sure you want to deactivate ${user.name}?`);
       if (!confirmDeactivate) return;
       try {
-        await api.delete(`/api/users/${user.id}`);
+        await api.put(`/api/users/${user.id}`, { name: user.name, role: user.role, isActive: false });
         showToast.success('User deactivated');
         fetchUsers();
       } catch (err) {
@@ -104,6 +104,22 @@ export default function UsersPage() {
       } catch (err) {
         showToast.error(err.response?.data?.message || 'Activation failed');
       }
+    }
+  };
+
+  const handleDeleteUser = async (user) => {
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ${user.name}? This will permanently remove the user and all their associated data.`
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      await api.delete(`/api/users/${user.id}`);
+      setUsers(prev => prev.filter(u => u.id !== user.id));
+      showToast.success(`User "${user.name}" deleted successfully`);
+    } catch (err) {
+      showToast.error(err.response?.data?.message || 'Delete failed');
     }
   };
 
@@ -249,6 +265,16 @@ export default function UsersPage() {
                           {u.isActive ? <PowerOff size={14} /> : <Power size={14} />}
                           {u.isActive ? 'Deactivate' : 'Activate'}
                         </Button>
+                        {currentUser?.role === 'Admin' && (
+                          <Button
+                            variant="danger"
+                            onClick={() => handleDeleteUser(u)}
+                            title={`Delete ${u.name}`}
+                            style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+                          >
+                            <Trash2 size={14} /> Delete
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

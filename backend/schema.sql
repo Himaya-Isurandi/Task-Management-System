@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS users (
   role user_role NOT NULL DEFAULT 'Collaborator',
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   must_reset_password BOOLEAN NOT NULL DEFAULT TRUE,
+  reset_otp_hash TEXT,
+  reset_otp_expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
