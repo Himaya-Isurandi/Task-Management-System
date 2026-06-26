@@ -13,20 +13,20 @@ const pool = new Pool({
   },
 });
 
+pool.connect((error, client, release) => {
+  if (error) {
+    console.error('Database connection failed:', error.message);
+    return;
+  }
+
+  console.log('Connected to Neon PostgreSQL database');
+  release();
+});
+
 pool.on('error', (error) => {
   console.error('Unexpected PostgreSQL pool error:', error.message);
 });
 
-const query = async (text, params) => {
-  try {
-    return await pool.query(text, params);
-  } catch (error) {
-    console.error('PostgreSQL query failed:', error.message);
-    throw error;
-  }
-};
+pool.pool = pool;
 
-module.exports = {
-  pool,
-  query,
-};
+module.exports = pool;

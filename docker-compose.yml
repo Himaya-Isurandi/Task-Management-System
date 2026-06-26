@@ -17,6 +17,13 @@ services:
       timeout: 5s
       retries: 5
 
+  maildev:
+    image: maildev/maildev
+    container_name: tms-maildev
+    ports:
+      - "1080:1080"
+      - "1025:1025"
+
   backend:
     build: ./backend
     container_name: tms-backend
@@ -33,10 +40,10 @@ services:
       JWT_REFRESH_SECRET: change_this_refresh_secret_in_production
       JWT_REFRESH_EXPIRES_IN: 30d
       FRONTEND_URL: http://localhost:3000
-      EMAIL_HOST: smtp.mailtrap.io
-      EMAIL_PORT: 587
-      EMAIL_USER: your_mailtrap_user
-      EMAIL_PASS: your_mailtrap_pass
+      EMAIL_HOST: maildev
+      EMAIL_PORT: 1025
+      EMAIL_USER: admin
+      EMAIL_PASS: pass
       EMAIL_FROM: noreply@tms.com
     ports:
       - "5000:5000"

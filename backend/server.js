@@ -1,16 +1,14 @@
 require('dotenv').config();
 
-const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const swaggerUi = require('swagger-ui-express');
 
+const pool = require('./db');
 const swaggerSpec = require('./src/config/swagger');
 const { initWebSocket } = require('./src/utils/websocket');
-const { startDeadlineScheduler } = require('./src/utils/scheduler');
-const { query } = require('./db');
 
 const authRoutes = require('./src/routes/authRoutes');
 const userRoutes = require('./src/routes/userRoutes');
@@ -21,7 +19,6 @@ const adminRoutes = require('./src/routes/adminRoutes');
 const projectRoutes = require('./src/routes/projectRoutes');
 
 const app = express();
-const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -62,21 +59,15 @@ app.use('/api/auth/login', authLimiter);
 
 app.get('/health', async (req, res) => {
   try {
-    const result = await query('SELECT NOW() AS time');
-
+    await pool.query('SELECT NOW() AS time');
     return res.status(200).json({
-      status: 'ok',
-      service: 'tms-backend',
-      database: 'connected',
-      provider: 'neon',
-      time: result.rows[0].time,
+      status: 'Server running',
+      database: 'Connected',
     });
   } catch (error) {
     return res.status(500).json({
-      status: 'error',
-      service: 'tms-backend',
-      database: 'connection_failed',
-      message: 'Unable to connect to the Neon PostgreSQL database.',
+      status: 'Server running',
+      database: 'Disconnected',
       error: process.env.NODE_ENV === 'production' ? undefined : error.message,
     });
   }
@@ -107,6 +98,10 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ errorCode: 'FILE_TOO_LARGE', message: 'File exceeds 10MB limit' });
   }
 
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ errorCode: 'CORS_FORBIDDEN', message: err.message });
+  }
+
   return res.status(500).json({
     errorCode: 'SERVER_ERROR',
     message: 'An unexpected error occurred',
@@ -115,18 +110,16 @@ app.use((err, req, res, next) => {
 });
 
 function startServer() {
+  const server = app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
+  });
+
   if (!isTest) {
     initWebSocket(server);
   }
 
-  server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Health check: http://localhost:${PORT}/health`);
-
-    if (!isTest) {
-      startDeadlineScheduler();
-    }
-  });
+  return server;
 }
 
 if (require.main === module) {
