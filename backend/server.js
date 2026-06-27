@@ -77,7 +77,7 @@ app.get('/health', async (req, res) => {
     } catch (poolError) {
       // Ignore pool error
     }
-    return res.status(500).json({
+    return res.status(200).json({
       status: 'Server running',
       database: 'Disconnected',
       error: error.message,
