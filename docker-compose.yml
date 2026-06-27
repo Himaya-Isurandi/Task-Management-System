@@ -1,14 +1,14 @@
 version: '3.8'
 
 services:
-  mysql:
+  db:
     image: mysql:8.0
     container_name: tms-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_ROOT_PASSWORD: 1234
       MYSQL_DATABASE: tms_db
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -17,27 +17,41 @@ services:
       timeout: 5s
       retries: 5
 
+  maildev:
+    image: maildev/maildev
+    container_name: tms-maildev
+    ports:
+      - "1080:1080"
+      - "1025:1025"
+
   backend:
     build: ./backend
     container_name: tms-backend
     environment:
       NODE_ENV: production
       PORT: 5000
-      DB_HOST: mysql
+      DB_HOST: db
       DB_PORT: 3306
       DB_NAME: tms_db
       DB_USER: root
       DB_PASSWORD: rootpassword
-      JWT_SECRET: change_this_secret_in_production
+      JWT_SECRET: change_this_secret_in_production_min_32_chars
       JWT_EXPIRES_IN: 7d
-      JWT_REFRESH_SECRET: change_this_refresh_secret
+      JWT_REFRESH_SECRET: change_this_refresh_secret_in_production
       JWT_REFRESH_EXPIRES_IN: 30d
       FRONTEND_URL: http://localhost:3000
+      EMAIL_HOST: maildev
+      EMAIL_PORT: 1025
+      EMAIL_USER: admin
+      EMAIL_PASS: pass
+      EMAIL_FROM: noreply@tms.com
     ports:
       - "5000:5000"
     depends_on:
-      mysql:
+      db:
         condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
 
   frontend:
     build: ./frontend
@@ -49,3 +63,4 @@ services:
 
 volumes:
   mysql_data:
+  uploads_data:

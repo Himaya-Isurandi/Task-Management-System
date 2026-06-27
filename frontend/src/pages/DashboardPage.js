@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { toast } from 'react-toastify';
 import useWebSocket from '../hooks/useWebSocket';
+import { sanitizeNotificationMessage } from '../utils/notificationText';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -30,7 +31,7 @@ export default function DashboardPage() {
   const handleWsMessage = useCallback((msg) => {
     if (['task_assigned', 'status_changed'].includes(msg.type)) {
       loadTasks();
-      toast.info(msg.notification?.message || 'Task updated');
+      toast.info(sanitizeNotificationMessage(msg.notification?.message || 'Task updated'));
     }
   }, [loadTasks]);
 

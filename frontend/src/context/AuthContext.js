@@ -8,38 +8,123 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      api.get('/api/auth/me')
-        .then(({ data }) => setUser(data.user))
-        .catch(() => { localStorage.clear(); setUser(null); })
-        .finally(() => setLoading(false));
-    } else {
+    const initAuth = async () => {
+      const savedUser = localStorage.getItem('tasknova_user');
+      const token = localStorage.getItem('accessToken');
+      if (savedUser && token) {
+        try {
+          const { data } = await api.get('/api/auth/me');
+          setUser(data.user);
+          localStorage.setItem('tasknova_user', JSON.stringify(data.user));
+        } catch (e) {
+          console.error('Session invalid, clearing:', e);
+          localStorage.removeItem('tasknova_user');
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+        }
+      }
       setLoading(false);
-    }
+    };
+    initAuth();
   }, []);
 
-  const login = async (email, password) => {
-    const { data } = await api.post('/api/auth/login', { email, password });
-    localStorage.setItem('accessToken', data.accessToken);
-    localStorage.setItem('refreshToken', data.refreshToken);
-    setUser(data.user);
-    return data;
+  // Real step 1: Login entry
+  const loginStep1 = async (email, password) => {
+    await api.post('/api/auth/login', { email, password });
+    return {
+      email
+    };
+  };
+
+  // Real step 2: Verification of OTP / 2FA Code
+  const verifyLogin = async (code, tempSession) => {
+    const response = await api.post('/api/auth/2fa/verify', { email: tempSession.email, code });
+
+    const { accessToken, refreshToken, user: loggedUser } = response.data;
+
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+    localStorage.setItem('tasknova_user', JSON.stringify(loggedUser));
+
+    setUser(loggedUser);
+    return loggedUser;
   };
 
   const logout = async () => {
-    try { await api.post('/api/auth/logout'); } catch {}
-    localStorage.clear();
-    setUser(null);
+    try {
+      await api.post('/api/auth/logout');
+    } catch (e) {
+      console.error('Logout error:', e);
+    } finally {
+      setUser(null);
+      localStorage.removeItem('tasknova_user');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+    }
   };
 
   const resetPassword = async (newPassword) => {
-    await api.put('/api/auth/reset-password', { newPassword });
-    setUser(prev => ({ ...prev, mustResetPassword: false }));
+    const { data } = await api.put('/api/auth/reset-password', { newPassword });
+    setUser(prev => {
+      if (!prev) return null;
+      const updated = { ...prev, ...(data.user || {}), mustResetPassword: false };
+      localStorage.setItem('tasknova_user', JSON.stringify(updated));
+      return updated;
+    });
+    return data;
+  };
+
+  const requestPasswordReset = async (email) => {
+    const { data } = await api.post('/api/auth/forgot-password', { email });
+    return data;
+  };
+
+  const verifyResetCode = async (email, code) => {
+    const { data } = await api.post('/api/auth/verify-reset-code', { email, code });
+    return data;
+  };
+
+  const setNewPassword = async (email, code, newPassword) => {
+    const { data } = await api.post('/api/auth/set-new-password', { email, code, newPassword });
+    return data;
+  };
+
+  const refreshUser = async () => {
+    try {
+      const { data } = await api.get('/api/auth/me');
+      setUser(data.user);
+      localStorage.setItem('tasknova_user', JSON.stringify(data.user));
+      return data.user;
+    } catch (e) {
+      console.error('refreshUser failed:', e);
+    }
+  };
+
+  const updateProfile = async (profileData) => {
+    const { data } = await api.put('/api/auth/profile', profileData);
+    setUser(prev => {
+      if (!prev) return null;
+      const updated = { ...prev, ...data.user };
+      localStorage.setItem('tasknova_user', JSON.stringify(updated));
+      return updated;
+    });
+    return data.user;
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, resetPassword }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      loginStep1, 
+      verifyLogin, 
+      logout, 
+      refreshUser,  
+      updateProfile,
+      resetPassword,
+      requestPasswordReset,
+      verifyResetCode,
+      setNewPassword
+    }}>
       {children}
     </AuthContext.Provider>
   );

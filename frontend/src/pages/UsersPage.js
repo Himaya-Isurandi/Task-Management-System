@@ -50,6 +50,21 @@ export default function UsersPage() {
     } catch { toast.error('Update failed'); }
   };
 
+  const deleteUser = async (u) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${u.name}? This will permanently remove the user and all their associated data.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/api/users/${u.id}`);
+      setUsers(prev => prev.filter(user => user.id !== u.id));
+      toast.success(`User "${u.name}" deleted successfully`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Delete failed');
+    }
+  };
+
   const roleColor = (r) => ({ Admin: '#ef4444', 'Project Manager': '#6366f1', Collaborator: '#10b981' }[r]);
 
   return (
@@ -92,6 +107,9 @@ export default function UsersPage() {
                       onClick={() => toggleActive(u)}
                     >
                       {u.isActive ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button className="btn btn-sm btn-danger" onClick={() => deleteUser(u)}>
+                      Delete
                     </button>
                   </td>
                 </tr>

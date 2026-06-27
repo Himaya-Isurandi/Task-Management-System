@@ -9,24 +9,45 @@ beforeAll(async () => {
   await connectDB();
 
   // Disable FK checks so we can truncate in any order
-  await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
-  await Task.destroy({ where: {}, truncate: true });
-  await User.destroy({ where: {}, truncate: true });
-  await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+  if (sequelize.getDialect() === 'mysql') {
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+  } else if (sequelize.getDialect() === 'sqlite') {
+    await sequelize.query('PRAGMA foreign_keys = OFF');
+  } else if (sequelize.getDialect() === 'postgres') {
+    await sequelize.query('TRUNCATE TABLE tasks, users CASCADE');
+  }
+  
+  if (sequelize.getDialect() !== 'postgres') {
+    await Task.destroy({ where: {}, truncate: true });
+    await User.destroy({ where: {}, truncate: true });
+  }
+  
+  if (sequelize.getDialect() === 'mysql') {
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+  } else if (sequelize.getDialect() === 'sqlite') {
+    await sequelize.query('PRAGMA foreign_keys = ON');
+  }
 
   await User.create({ name: 'Admin', email: 'admin@test.com', password: 'Admin@1234', role: 'Admin', mustResetPassword: false });
   await User.create({ name: 'PM', email: 'pm@test.com', password: 'Pm@12345', role: 'Project Manager', mustResetPassword: false });
   const collaborator = await User.create({ name: 'Collab', email: 'collab@test.com', password: 'Collab@123', role: 'Collaborator', mustResetPassword: false });
   collaboratorId = collaborator.id;
 
-  const adminLogin = await request(app).post('/api/auth/login').send({ email: 'admin@test.com', password: 'Admin@1234' });
-  adminToken = adminLogin.body.accessToken;
+  const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.111111);
 
-  const pmLogin = await request(app).post('/api/auth/login').send({ email: 'pm@test.com', password: 'Pm@12345' });
-  pmToken = pmLogin.body.accessToken;
+  await request(app).post('/api/auth/login').send({ email: 'admin@test.com', password: 'Admin@1234' });
+  const adminVerify = await request(app).post('/api/auth/2fa/verify').send({ email: 'admin@test.com', code: '199999' });
+  adminToken = adminVerify.body.accessToken;
 
-  const collabLogin = await request(app).post('/api/auth/login').send({ email: 'collab@test.com', password: 'Collab@123' });
-  collaboratorToken = collabLogin.body.accessToken;
+  await request(app).post('/api/auth/login').send({ email: 'pm@test.com', password: 'Pm@12345' });
+  const pmVerify = await request(app).post('/api/auth/2fa/verify').send({ email: 'pm@test.com', code: '199999' });
+  pmToken = pmVerify.body.accessToken;
+
+  await request(app).post('/api/auth/login').send({ email: 'collab@test.com', password: 'Collab@123' });
+  const collabVerify = await request(app).post('/api/auth/2fa/verify').send({ email: 'collab@test.com', code: '199999' });
+  collaboratorToken = collabVerify.body.accessToken;
+
+  randomSpy.mockRestore();
 });
 
 afterAll(async () => {

@@ -1,14 +1,7 @@
-FROM node:18-alpine
-
+FROM node:20-alpine
 WORKDIR /app
-
-# Install dependencies first (better caching)
 COPY package*.json ./
-RUN npm ci --only=production
-
-# Copy source
+RUN npm install --production
 COPY . .
-
 EXPOSE 5000
-
-CMD ["node", "src/server.js"]
+CMD ["node", "server.js"]

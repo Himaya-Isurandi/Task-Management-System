@@ -1,26 +1,15 @@
-const router = require('express').Router();
-const { body } = require('express-validator');
-const { getUsers, getUserById, createUser, updateUser, deactivateUser } = require('../controllers/userController');
+const express = require('express');
+const router = express.Router();
 const { authenticate, authorize, checkPasswordReset } = require('../middleware/auth');
-const { validate } = require('../middleware/validate');
+const { getUsers, getUserById, createUser, updateUser, deactivateUser, resendInvitation } = require('../controllers/userController');
 
-// All user routes require authentication
-router.use(authenticate, checkPasswordReset);
+router.use(authenticate, checkPasswordReset, authorize('Admin'));
 
-// Admin only routes
-router.get('/', authorize('Admin'), getUsers);
-router.post('/',
-  authorize('Admin'),
-  [
-    body('name').notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Valid email required'),
-    body('role').isIn(['Admin', 'Project Manager', 'Collaborator']).withMessage('Invalid role'),
-    validate,
-  ],
-  createUser
-);
-router.get('/:id', authorize('Admin'), getUserById);
-router.put('/:id', authorize('Admin'), updateUser);
-router.delete('/:id', authorize('Admin'), deactivateUser);
+router.get('/', getUsers);
+router.get('/:id', getUserById);
+router.post('/', createUser);
+router.post('/:id/resend-invitation', resendInvitation);
+router.put('/:id', updateUser);
+router.delete('/:id', deactivateUser);
 
 module.exports = router;

@@ -1,7 +1,19 @@
 const router = require('express').Router();
 const { body } = require('express-validator');
-const { login, refresh, logout, resetPassword, getMe } = require('../controllers/authController');
-const { authenticate } = require('../middleware/auth');
+const {
+  login,
+  refresh,
+  logout,
+  resetPassword,
+  getMe,
+  verify2fa,
+  updateProfile,
+  changePassword,
+  forgotPassword,
+  verifyResetCode,
+  setNewPassword,
+} = require('../controllers/authController');
+const { authenticate, checkPasswordReset } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 
 /**
@@ -36,15 +48,58 @@ router.post('/login',
 );
 
 router.post('/refresh', refresh);
+router.post('/forgot-password',
+  [
+    body('email').isEmail().withMessage('Valid email required'),
+    validate,
+  ],
+  forgotPassword
+);
+router.post('/verify-reset-code',
+  [
+    body('email').isEmail().withMessage('Valid email required'),
+    body('code').isLength({ min: 6, max: 6 }).withMessage('Reset code must be 6 digits'),
+    validate,
+  ],
+  verifyResetCode
+);
+router.post('/set-new-password',
+  [
+    body('email').isEmail().withMessage('Valid email required'),
+    body('code').isLength({ min: 6, max: 6 }).withMessage('Reset code must be 6 digits'),
+    body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+    body('newPassword').matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/).withMessage('Password must contain lowercase, uppercase, a number, and a symbol'),
+    validate,
+  ],
+  setNewPassword
+);
 router.post('/logout', authenticate, logout);
 router.get('/me', authenticate, getMe);
 router.put('/reset-password',
   authenticate,
   [
     body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+    body('newPassword').matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/).withMessage('Password must contain lowercase, uppercase, a number, and a symbol'),
     validate,
   ],
   resetPassword
 );
+
+// 2FA and Profile endpoints
+router.post('/2fa/verify',
+  [
+    body('email').isEmail().withMessage('Valid email required'),
+    body('code').isLength({ min: 6, max: 6 }).withMessage('Verification code must be 6 digits'),
+    validate,
+  ],
+  verify2fa
+);
+router.put('/profile', authenticate, checkPasswordReset, updateProfile);
+router.put('/change-password', authenticate, checkPasswordReset, [
+  body('currentPassword').notEmpty().withMessage('Current password is required'),
+  body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])/).withMessage('Password must contain lowercase, uppercase, a number, and a symbol'),
+  validate
+], changePassword);
 
 module.exports = router;
