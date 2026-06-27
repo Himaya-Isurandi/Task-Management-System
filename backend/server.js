@@ -25,14 +25,15 @@ const isTest = process.env.NODE_ENV === 'test';
 
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:3000')
   .split(',')
-  .map(origin => origin.trim())
+  .map(origin => origin.trim().replace(/\/$/, ''))
   .filter(Boolean);
 
 app.use(helmet());
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    const normalizedOrigin = origin ? origin.trim().replace(/\/$/, '') : '';
+    if (!origin || allowedOrigins.includes(normalizedOrigin)) {
       return callback(null, true);
     }
 
