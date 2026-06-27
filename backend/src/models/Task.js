@@ -26,25 +26,31 @@ const Task = sequelize.define('Task', {
   dueDate: {
     type: DataTypes.DATEONLY,
     allowNull: true,
+    field: 'due_date',
   },
   assignedTo: {
     type: DataTypes.UUID,
     allowNull: true,
     references: { model: 'users', key: 'id' },
+    field: 'assigned_user_id',
   },
   createdBy: {
     type: DataTypes.UUID,
     allowNull: false,
     references: { model: 'users', key: 'id' },
+    field: 'created_by',
   },
   projectId: {
     type: DataTypes.UUID,
     allowNull: true,
     references: { model: 'projects', key: 'id' },
+    field: 'project_id',
   },
 }, {
   tableName: 'tasks',
   timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
 });
 
 module.exports = Task;

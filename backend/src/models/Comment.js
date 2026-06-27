@@ -15,15 +15,19 @@ const Comment = sequelize.define('Comment', {
     type: DataTypes.UUID,
     allowNull: false,
     references: { model: 'tasks', key: 'id' },
+    field: 'task_id',
   },
   userId: {
     type: DataTypes.UUID,
     allowNull: false,
     references: { model: 'users', key: 'id' },
+    field: 'user_id',
   },
 }, {
   tableName: 'comments',
   timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: false,
 });
 
 module.exports = Comment;

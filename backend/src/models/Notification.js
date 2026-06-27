@@ -11,6 +11,7 @@ const Notification = sequelize.define('Notification', {
     type: DataTypes.UUID,
     allowNull: false,
     references: { model: 'users', key: 'id' },
+    field: 'user_id',
   },
   message: {
     type: DataTypes.STRING(500),
@@ -23,15 +24,19 @@ const Notification = sequelize.define('Notification', {
   isRead: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
+    field: 'is_read',
   },
   taskId: {
     type: DataTypes.UUID,
     allowNull: true,
     references: { model: 'tasks', key: 'id' },
+    field: 'task_id',
   },
 }, {
   tableName: 'notifications',
   timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: false,
 });
 
 module.exports = Notification;
