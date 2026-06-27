@@ -80,7 +80,7 @@ app.get('/health', async (req, res) => {
     return res.status(500).json({
       status: 'Server running',
       database: 'Disconnected',
-      error: process.env.NODE_ENV === 'production' ? undefined : error.message,
+      error: error.message,
     });
   }
 });
