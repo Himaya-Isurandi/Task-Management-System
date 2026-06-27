@@ -13,21 +13,32 @@ const testUsers = [
 ];
 
 const prepareLegacyUsersTable = async () => {
-  const fallbackHash = await bcrypt.hash('ChangeMe@1234', 12);
+  try {
+    const databaseUrl = process.env.DATABASE_URL || process.env.MYSQL_URL || '';
+    const isPostgresUrl = databaseUrl.startsWith('postgres://') || databaseUrl.startsWith('postgresql://');
+    if (!isPostgresUrl) {
+      console.log('Skipping legacy users table preparation (not a PostgreSQL database URL)');
+      return;
+    }
 
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT');
-  await pool.query('UPDATE users SET password_hash = $1 WHERE password_hash IS NULL OR password_hash = $2', [fallbackHash, '']);
-  await pool.query('ALTER TABLE users ALTER COLUMN password_hash SET NOT NULL');
+    const fallbackHash = await bcrypt.hash('ChangeMe@1234', 12);
 
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true');
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS must_reset_password BOOLEAN NOT NULL DEFAULT false');
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()');
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_otp_hash VARCHAR(255)');
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_otp_expires_at TIMESTAMP WITH TIME ZONE');
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "refreshToken" TEXT');
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)');
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT');
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS department VARCHAR(100)');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT');
+    await pool.query('UPDATE users SET password_hash = $1 WHERE password_hash IS NULL OR password_hash = $2', [fallbackHash, '']);
+    await pool.query('ALTER TABLE users ALTER COLUMN password_hash SET NOT NULL');
+
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS must_reset_password BOOLEAN NOT NULL DEFAULT false');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_otp_hash VARCHAR(255)');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_otp_expires_at TIMESTAMP WITH TIME ZONE');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "refreshToken" TEXT');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS department VARCHAR(100)');
+  } catch (err) {
+    console.warn('Warning: prepareLegacyUsersTable failed, proceeding anyway:', err.message);
+  }
 };
 
 const seed = async () => {

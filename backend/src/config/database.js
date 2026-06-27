@@ -8,7 +8,7 @@ require('pg-hstore');
 const useSQLite = process.env.DB_DIALECT === 'sqlite';
 const isProduction = process.env.NODE_ENV === 'production';
 const enableSqlLogging = process.env.DB_LOGGING === 'true';
-const databaseUrl = process.env.DATABASE_URL || '';
+const databaseUrl = process.env.DATABASE_URL || process.env.MYSQL_URL || '';
 const databaseUrlProtocol = (() => {
   try {
     return databaseUrl ? new URL(databaseUrl).protocol.replace(':', '') : '';
@@ -62,12 +62,12 @@ if (databaseUrl && isDatabaseUrl) {
 
   const dialect = process.env.DB_DIALECT || 'mysql';
   sequelize = new Sequelize(
-    process.env.DB_NAME,
-    process.env.DB_USER,
-    process.env.DB_PASSWORD,
+    process.env.DB_NAME || process.env.MYSQLDATABASE,
+    process.env.DB_USER || process.env.MYSQLUSER,
+    process.env.DB_PASSWORD || process.env.MYSQLPASSWORD,
     {
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT || (dialect === 'postgres' ? 5432 : 3306),
+      host: process.env.DB_HOST || process.env.MYSQLHOST,
+      port: process.env.DB_PORT || process.env.MYSQLPORT || (dialect === 'postgres' ? 5432 : 3306),
       dialect: dialect,
       dialectModule: dialect === 'postgres' ? pg : undefined,
       logging: enableSqlLogging ? console.log : false,

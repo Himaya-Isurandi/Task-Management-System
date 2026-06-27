@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const swaggerUi = require('swagger-ui-express');
 
 const pool = require('./db');
+const { connectDB, sequelize } = require('./src/config/database');
 const swaggerSpec = require('./src/config/swagger');
 const { initWebSocket } = require('./src/utils/websocket');
 
@@ -59,12 +60,23 @@ app.use('/api/auth/login', authLimiter);
 
 app.get('/health', async (req, res) => {
   try {
-    await pool.query('SELECT NOW() AS time');
+    await sequelize.authenticate();
     return res.status(200).json({
       status: 'Server running',
       database: 'Connected',
     });
   } catch (error) {
+    try {
+      if (pool && typeof pool.query === 'function') {
+        await pool.query('SELECT NOW() AS time');
+        return res.status(200).json({
+          status: 'Server running',
+          database: 'Connected (legacy pool)',
+        });
+      }
+    } catch (poolError) {
+      // Ignore pool error
+    }
     return res.status(500).json({
       status: 'Server running',
       database: 'Disconnected',
@@ -109,8 +121,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-function startServer() {
-  const server = app.listen(PORT, () => {
+async function startServer() {
+  if (!isTest) {
+    try {
+      await connectDB();
+    } catch (err) {
+      console.error('Database connection failed on startup:', err.message);
+    }
+  }
+
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/health`);
   });
